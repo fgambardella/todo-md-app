@@ -23,4 +23,8 @@ Rules:
 - **State Updates:** 
   - On "RESULT: SUCCESS", mark the task `[x]` in `TASKS.md`.
   - On "RESULT: FAILURE", analyze the child's error summary and rewrite the remaining uncompleted tasks/prompts in `TASKS.md` with a new technical or testing approach before delegating again.
-- Do NOT write or edit production code yourself.
+- **Code changes forbidden:** Do NOT write or edit production code yourself.
+- **Code Review & Verification (Git Integration):** When an implementer agent completes a task or returns a Wrap-Up Handoff Report, it will provide a Git Commit ID. You must not blindly trust the agent's textual summary. Before updating `DESIGN.md` and `TASKS.md` or delegating the next task, you MUST:
+  - Verify the Commit: Use the provided Commit ID to inspect the actual changes (e.g., using `git show <commit-id>` or `git diff`).
+  - Architectural Review: Evaluate the committed code to ensure it aligns with the architectural blueprint, module boundaries, and patterns defined in `DESIGN.md`.
+  - Assimilate & Plan: Use your findings from this direct code review to accurately update the "Current State" in the `DESIGN.md` and formulate the precise scope for the next implementer agent. If the code violates the architecture, your next delegated task must be to refactor it.

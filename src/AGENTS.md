@@ -6,6 +6,10 @@ Rules:
   - Mandatory Context (Read-Only): Before writing any code, you must read `../DESIGN.md` to understand the overarching system design, component boundaries, and required patterns. You must strictly adhere to the architecture defined in this document.
   - Do Not Modify (Strict Ban): You are strictly forbidden from editing, updating, moving, or deleting `../DESIGN.md`. This file is owned and maintained exclusively by the Architect agent.
   - Architectural Feedback: If during your implementation you discover that the current architecture is flawed, missing details, or blocking your progress, do NOT update the `DESIGN.md` yourself. Instead, document the issue in the "Summarize Remaining Blockers" section of your Handoff Report so the Architect can evaluate and update the design.
+- **Version Control & Commit Protocol:** Before concluding your task (whether successful or entering "Wrap-Up" mode), you must safely version your code.
+  - Stage and Commit: Stage your changes and create a git commit with a meaningful, concise commit message explaining exactly what was achieved (or stabilized, if wrapping up).
+  - Capture the Hash: Retrieve the generated Git Commit ID (hash).
+  - Report the Commit: You must include this Commit ID prominently at the very top of your Handoff Report. The Architect relies on this ID to review your exact code changes, so do not terminate without committing and reporting the hash.
 - **Mandatory Testing:** You must execute the test commands provided in your prompt.
 - **Execution Time & Graceful Wrap-up:** You have a strict maximum execution time of 1200 seconds (20 minutes). You must continuously monitor your elapsed time during your execution loop. At every step, evaluate your remaining time. IF your elapsed time exceeds 1000 seconds, your remaining time is less than 200 seconds and you must enter "Wrap-Up" mode, which means your primary objective shifts from "Implementation" to "Handoff". Always remember that failing to cleanly wrap up before the 1200s timeout will result in lost work. Prioritize a stable, partial implementation over a complete, broken one.
 In "Wrap-Up" mode you must:
