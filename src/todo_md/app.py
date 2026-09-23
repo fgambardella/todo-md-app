@@ -117,6 +117,7 @@ class TodoApp:
         self.data_dir = data_dir if data_dir is not None else self.controller.store.data_dir
         self.current_list: str | None = None
         self._item_rows: list[tuple] = []
+        self._palette: dict | None = None
 
         self.root = tk.Tk()
         self.root.title("TODO Markdown App")
@@ -209,6 +210,7 @@ class TodoApp:
 
         try:
             self.root.tk.call("tk", "appappearance", theme)
+            self._palette = None
             return
         except tk.TclError:
             pass
@@ -219,6 +221,8 @@ class TodoApp:
         else:
             bg, fg = "#f5f5f5", "#000000"
             btn_bg, entry_bg = "#e0e0e0", "#ffffff"
+
+        self._palette = {"bg": bg, "fg": fg, "btn_bg": btn_bg, "entry_bg": entry_bg}
 
         style = ttk.Style(self.root)
         style.theme_use("clam")
@@ -344,19 +348,24 @@ class TodoApp:
         active_fg, done_fg = self._text_colors(self.items_frame)
 
         todo_list = self.controller.open_list(self.current_list)
+        row_bg = self._palette["bg"] if self._palette is not None else None
         for index, item in enumerate(todo_list.items):
-            row = tk.Frame(self.items_frame)
+            row_kwargs = {"bg": row_bg} if row_bg is not None else {}
+            row = tk.Frame(self.items_frame, **row_kwargs)
             row.pack(anchor="w", fill=tk.X)
 
             var = tk.IntVar(value=1 if item.done else 0)
+            cb_kwargs = {"bg": row_bg} if row_bg is not None else {}
             cb = tk.Checkbutton(
                 row,
                 variable=var,
                 command=lambda i=index: self._on_toggle_item(i),
+                **cb_kwargs,
             )
             cb.pack(side=tk.LEFT, padx=(4, 6))
 
-            del_ctrl = tk.Label(row, image=self._trash_image, cursor="hand2")
+            del_kwargs = {"bg": row_bg} if row_bg is not None else {}
+            del_ctrl = tk.Label(row, image=self._trash_image, cursor="hand2", **del_kwargs)
             del_ctrl.pack(side=tk.RIGHT, padx=(6, 4))
             del_ctrl.bind("<Button-1>", lambda e, i=index: self._on_delete_item(i))
 
@@ -366,12 +375,14 @@ class TodoApp:
             else:
                 label_font.config(overstrike=0)
 
+            label_kwargs = {"bg": row_bg} if row_bg is not None else {}
             label = tk.Label(
                 row,
                 text=item.text,
                 anchor="w",
                 font=label_font,
                 foreground=done_fg if item.done else active_fg,
+                **label_kwargs,
             )
             label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
