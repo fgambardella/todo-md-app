@@ -11,6 +11,7 @@ import os
 
 from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
+from .theme import load_theme, save_theme  # headless module (stdlib only)
 
 __all__ = ["TodoController", "TodoApp", "run"]
 
@@ -107,10 +108,13 @@ class TodoApp:
     this class's module never requires a display.
     """
 
-    def __init__(self, controller: TodoController) -> None:
+    def __init__(
+        self, controller: TodoController, data_dir: str | None = None
+    ) -> None:
         import tkinter as tk  # lazy: keep module importable headless
 
         self.controller = controller
+        self.data_dir = data_dir if data_dir is not None else self.controller.store.data_dir
         self.current_list: str | None = None
         self._item_rows: list[tuple] = []
 
@@ -119,12 +123,20 @@ class TodoApp:
         self.root.geometry("700x420")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        # Theme: load (first start creates config.json) and apply before
+        # the UI is built so every widget starts in the right palette.
+        self.theme = load_theme(self.data_dir)
+        self._apply_theme(self.theme)
+
         # Cached trash-bin icon (~18px after subsampling the 512x512 source).
         self._trash_image = tk.PhotoImage(
             file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "trash.png")
         ).subsample(28)
 
         self._build_ui()
+        # Re-apply after the UI exists: the fallback palette must set
+        # explicit backgrounds on items_frame/listbox once they are created.
+        self._apply_theme(self.theme)
         self.refresh_lists(select_first=True)
 
     # -- construction -----------------------------------------------------
@@ -154,6 +166,11 @@ class TodoApp:
             side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0)
         )
 
+        self._theme_btn = ttk.Button(
+            left, text=self._theme_button_text(), command=self._on_toggle_theme
+        )
+        self._theme_btn.pack(fill=tk.X, pady=(6, 0))
+
         # --- right frame: items ------------------------------------------
         right = ttk.Frame(self.root, padding=8)
         right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -172,6 +189,62 @@ class TodoApp:
         ttk.Button(add_row, text="Add", command=self._on_add_item).pack(
             side=tk.LEFT, padx=(6, 0)
         )
+
+    # -- theme ------------------------------------------------------------
+
+    def _theme_button_text(self) -> str:
+        """Label of the switcher button: the theme a click would switch TO."""
+        return "🌙 Dark" if self.theme == "light" else "☀️ Light"
+
+    def _apply_theme(self, theme: str) -> None:
+        """Apply 'dark'/'light' to the running GUI.
+
+        Primary path: ``tk appappearance`` (Tk 9) — keeps the native aqua
+        look in either theme.  Fallback (``tk.TclError``): ttk "clam"
+        theme with explicit palettes, since plain tk widgets resolve an
+        unset background to a *system* color that does not flip.
+        """
+        import tkinter as tk
+        from tkinter import ttk
+
+        try:
+            self.root.tk.call("tk", "appappearance", theme)
+            return
+        except tk.TclError:
+            pass
+
+        if theme == "dark":
+            bg, fg = "#1e1e1e", "#f0f0f0"
+            btn_bg, entry_bg = "#3c3c3c", "#2d2d2d"
+        else:
+            bg, fg = "#f5f5f5", "#000000"
+            btn_bg, entry_bg = "#e0e0e0", "#ffffff"
+
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+        style.configure("TFrame", background=bg, foreground=fg)
+        style.configure("TLabel", background=bg, foreground=fg)
+        style.configure("TButton", background=btn_bg, foreground=fg)
+        style.configure("TEntry", background=entry_bg, foreground=fg)
+        self.root.config(bg=bg)
+
+        # Plain tk widgets inherit the *parent's effective* background;
+        # set it explicitly so the item rows and their labels flip.
+        items_frame = getattr(self, "items_frame", None)
+        if items_frame is not None:
+            items_frame.config(bg=bg)
+        listbox = getattr(self, "listbox", None)
+        if listbox is not None:
+            listbox.config(bg=entry_bg, fg=fg, highlightbackground=btn_bg)
+
+    def _on_toggle_theme(self) -> None:
+        new = "light" if self.theme == "dark" else "dark"
+        save_theme(self.data_dir, new)
+        self.theme = new
+        self._apply_theme(new)
+        self._theme_btn.config(text=self._theme_button_text())
+        # Re-resolve the luminance-adaptive label colors.
+        self._refresh_items()
 
     # -- list-frame handlers ----------------------------------------------
 

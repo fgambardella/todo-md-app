@@ -39,10 +39,10 @@ src/
 - **CLI**: `python -m todo_md` (from `src/`, using the venv).
 - **Disk**: `~/.todo-md-app/lists/*.md`, `~/.todo-md-app/lists/config.json` (UTF-8 JSON, key `theme`).
 - **OS**: macOS `defaults read -g AppleInterfaceStyle` for system theme detection (graceful fallback to "light" off-macOS or on error).
-- **Tk/Tcl**: `tk appappearance <light|dark>` (available on Tk 9; this machine runs Tcl/Tk 9) with a "clam" palette fallback for Tk 8.6.
+- **Tk/Tcl**: on this machine (Tcl/Tk 9.0.4) the `tk appappearance` subcommand is NOT available (raises `TclError`) even though it is a documented Tk 9 feature; `_apply_theme` therefore always takes the "clam" palette fallback here, with the `appappearance` attempt kept as the primary path for Tk builds that do support it.
 
 ## Current State & Known Debt
 
-- **Done (Tasks 1–10, 38 tests passing)**: storage, models, controller, GUI, toggle bug fix, layout, trash-icon delete control (18px transparent icon on a `tk.Label` bound to `<Button-1>`), luminance-adaptive label foreground.
-- **In progress (Tasks 11–12)**: `theme.py` headless theme config (Task 11); GUI theme switcher + startup application + persistence (Task 12).
-- **Known quirks**: `trash.png` is 512×512 (displayed via `.subsample(28)` → ~18px); Tcl 9 rejects `compound="image"` (use `"center"`); GUI tests must destroy `root` in `finally` and call `root.update()` after building; effective widget background is probed via `winfo_rgb(widget.cget("bg"))` normalized by `winfo_rgb("#ffffff")[0]`.
+- **Done (Tasks 1–12, 51 tests passing)**: storage, models, controller, GUI, toggle bug fix, layout, trash-icon delete control (18px transparent icon on a `tk.Label` bound to `<Button-1>`), luminance-adaptive label foreground, headless `theme.py` config (config.json next to the lists, system default detection, atomic load/save), and the GUI theme switcher: `TodoApp.__init__(controller, data_dir=None)` loads and applies the theme before building the UI and re-applies it after `_build_ui()` (idempotent) so the clam-palette fallback sets explicit backgrounds on `items_frame`/`listbox`; `self._theme_btn` toggles light/dark, persists via `save_theme`, and `_refresh_items()` re-resolves adaptive label colors.
+- **No pending tasks.**
+- **Known quirks**: `trash.png` is 512×512 (displayed via `.subsample(28)` → ~18px); Tcl 9.0.4 on this machine rejects BOTH `compound="image"` (use `"center"`) AND `tk appappearance` (TclError → clam fallback is always live); OS default appearance on this Mac is dark; GUI tests must destroy `root` in `finally` and call `root.update()` after building; effective widget background is probed via `winfo_rgb(widget.cget("bg"))` normalized by `winfo_rgb("#ffffff")[0]`.
