@@ -232,9 +232,11 @@ class TodoApp:
         if theme == "dark":
             bg, fg = "#1e1e1e", "#f0f0f0"
             btn_bg, entry_bg = "#3c3c3c", "#2d2d2d"
+            btn_active = "#2e2e2e"
         else:
             bg, fg = "#f5f5f5", "#000000"
             btn_bg, entry_bg = "#e0e0e0", "#ffffff"
+            btn_active = "#d0d0d0"
 
         self._palette = {"bg": bg, "fg": fg, "btn_bg": btn_bg, "entry_bg": entry_bg}
 
@@ -243,6 +245,15 @@ class TodoApp:
         style.configure("TFrame", background=bg, foreground=fg)
         style.configure("TLabel", background=bg, foreground=fg)
         style.configure("TButton", background=btn_bg, foreground=fg)
+        # Clam's default 'activeBackground' state stays light, so hovering a
+        # button in dark mode flashes a light fill and hides the light text;
+        # map the active/pressed states to a slightly darker fill while
+        # keeping the palette foreground. Normal appearance is unchanged.
+        style.map(
+            "TButton",
+            background=[("active", btn_active), ("pressed", btn_active)],
+            foreground=[("active", fg), ("pressed", fg)],
+        )
         # The clam TEntry field element consumes the *element* option
         # fieldbackground for its fill; background/foreground alone leave
         # a light field in dark mode, making light text invisible.
