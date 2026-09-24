@@ -6,6 +6,8 @@ default -bg to `systemWindowBackgroundColor`, which never re-resolves.
 The app must therefore pass explicit palette colors to the row widgets.
 """
 
+import json
+
 from todo_md.app import TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
 
@@ -20,11 +22,15 @@ def lum(root, color):
 def _build_app(tmp_path):
     store = MarkdownListStore(str(tmp_path))
     controller = TodoController(store)
-    return controller, TodoApp(controller)
+    return controller, TodoApp(controller, config_dir=str(tmp_path / "config"))
 
 
 def test_item_rows_follow_theme_switches(tmp_path):
-    (tmp_path / "config.json").write_text('{"theme": "light"}', encoding="utf-8")
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "settings.json").write_text(
+        json.dumps({"theme": "light"}), encoding="utf-8"
+    )
     controller, app = _build_app(tmp_path)
     try:
         root = app.root

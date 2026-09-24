@@ -21,7 +21,7 @@ def test_item_label_layout(tmp_path):
     controller.create_list("work")
     controller.add_item("work", LONG_TEXT)
 
-    app = TodoApp(controller)
+    app = TodoApp(controller, config_dir=str(tmp_path / "config"))
     app.root.update()
     try:
         assert app._item_rows, "expected at least one item row"
