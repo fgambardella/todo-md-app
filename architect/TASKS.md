@@ -23,7 +23,19 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None.
+**Task 15 — Entry fields keep light fill in dark theme (contrast bug)**
+
+- Branch: `implementer/15-entry-dark-contrast` (base `main`).
+- Symptom: in dark mode both input boxes (list-name entry, new-item entry) render with a light background, making the light text invisible. Reproduced after light→dark toggle.
+- Confirmed root cause: in this Tk build the clam `TEntry` field element (`Entry.field`) consumes the `fieldbackground` style option (element options: `bordercolor`, `lightcolor`, `fieldbackground`), but `_apply_theme` in `src/todo_md/app.py` only configures `background`/`foreground`, so the field keeps its default light fill in dark mode.
+- Scope: fix `_apply_theme`'s fallback path so the entry field fill follows the palette in both themes (e.g., set `fieldbackground=entry_bg` on the `TEntry` style); keep light-mode entries white; do not change controller/storage/theme modules.
+- Acceptance criteria:
+  1. Dark theme (fresh start and after light→dark toggle): both entries' field fill is dark (luminance < 0.5) and entry text is light.
+  2. Light theme (fresh start and after dark→light toggle): both entries' field fill is light (luminance > 0.5).
+  3. Full suite passes; no regressions.
+- Required tests: extend `src/tests/test_gui_theme.py` (existing conventions: probe effective colors via `winfo_rgb` luminance, `root.update()` after building/toggling, `root.destroy()` in `finally`) with a test asserting the `TEntry` field fill option (`ttk.Style(root).lookup("TEntry", "fieldbackground")`) is dark in dark and light in light, after startup and after toggles in both directions.
+- Test commands (from `implementer/src`): `.venv/bin/python -m pytest tests/test_gui_theme.py -v` then `.venv/bin/python -m pytest tests -v`.
+- Delegated prompt: see Git commit of this file (task text above is the full prompt content plus the generic delegation rules).
 
 ## Queue
 
