@@ -45,7 +45,7 @@ implementer/src/
 - **CLI**: `python -m todo_md` (from `implementer/src`, using the venv).
 - **Disk**: `~/.todo-md-app/lists/*.md` + theme setting JSON at `~/.todo-md-app/config/settings.json` (UTF-8, key `theme`).
 - **OS**: macOS `defaults read -g AppleInterfaceStyle` (dark → "dark"; non-macOS or error → "light").
-- **Tk/Tcl**: on this machine (Tcl/Tk 9.0.4) `tk appappearance` raises `TclError` (clam fallback is always live) and `compound="image"` is rejected (use `"center"`).
+- **Tk/Tcl**: on this machine (Tcl/Tk 9.0.4) `tk appappearance` raises `TclError` (clam fallback is always live), `compound="image"` is rejected (use `"center"`), and the clam `TEntry` field element fills from the `fieldbackground` element option — setting `background` alone leaves a light field in dark mode.
 
 ## Known Architectural Debt
 
