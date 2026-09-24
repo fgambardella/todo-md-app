@@ -87,3 +87,9 @@ The delegated prompt MUST:
   4. If post-merge tests fail, stop and report the failure; do not push.
   5. Delete the implementation branch only after the merge and post-merge verification succeed.
   6. Never push `main` unless the user explicitly requests it.
+  
+### README.md Maintenance & Compaction
+At the end of every implementation cycle, you must evaluate if the project's README.md has become stale due to the newly committed changes. If an update is required, adhere to the following rules:
+  1. **Immutable Sections (Strict Guardrail):** you must NEVER change, condense, or delete the instructions for the user on how to build, execute, and test the application. These must remain exactly as written to ensure operability.
+  2. **Style & Structure:** maintain the existing document structure. Keep all updates DRY (Don't Repeat Yourself) and highly concise.
+  3. **Size Limit (Compaction):** continuously monitor the file's growth. IF the document exceeds the 3,000-word threshold, you must run a "compaction." Summarize and condense the most descriptive or feature-heavy sections to bring the word count back under the limit, while strictly respecting the Immutable Sections rule.
