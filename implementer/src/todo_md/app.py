@@ -231,14 +231,22 @@ class TodoApp:
 
         if theme == "dark":
             bg, fg = "#1e1e1e", "#f0f0f0"
-            btn_bg, entry_bg = "#3c3c3c", "#2d2d2d"
+            btn_bg, entry_bg = "#3c3c3c", "#383838"
+            list_bg = "#2d2d2d"
             btn_active = "#2e2e2e"
         else:
             bg, fg = "#f5f5f5", "#000000"
             btn_bg, entry_bg = "#e0e0e0", "#ffffff"
+            list_bg = "#ffffff"
             btn_active = "#d0d0d0"
 
-        self._palette = {"bg": bg, "fg": fg, "btn_bg": btn_bg, "entry_bg": entry_bg}
+        self._palette = {
+            "bg": bg,
+            "fg": fg,
+            "btn_bg": btn_bg,
+            "entry_bg": entry_bg,
+            "list_bg": list_bg,
+        }
 
         style = ttk.Style(self.root)
         style.theme_use("clam")
@@ -257,6 +265,10 @@ class TodoApp:
         # The clam TEntry field element consumes the *element* option
         # fieldbackground for its fill; background/foreground alone leave
         # a light field in dark mode, making light text invisible.
+        # In dark mode the entry fill (#383838) is deliberately slightly
+        # lighter than the listbox background (#2d2d2d): with identical
+        # colors the entries read as *darker* than the list (optical
+        # effect), so a lighter entry fill corrects the perceived contrast.
         style.configure(
             "TEntry",
             background=entry_bg,
@@ -272,7 +284,7 @@ class TodoApp:
             items_frame.config(bg=bg)
         listbox = getattr(self, "listbox", None)
         if listbox is not None:
-            listbox.config(bg=entry_bg, fg=fg, highlightbackground=btn_bg)
+            listbox.config(bg=list_bg, fg=fg, highlightbackground=btn_bg)
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"

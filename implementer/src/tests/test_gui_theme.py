@@ -163,6 +163,44 @@ def test_tentry_field_fill_dark_startup(tmp_path):
         app.root.destroy()
 
 
+def test_entry_fill_lighter_than_listbox_dark(tmp_path):
+    from tkinter import ttk
+
+    _write_config(tmp_path, "dark")
+    app = _build_app(tmp_path)
+    try:
+        root = app.root
+        root.update()
+        style = ttk.Style(root)
+
+        # Dark palette: entry fill is a separate, lighter value than the list.
+        assert style.lookup("TEntry", "fieldbackground") == "#383838"
+        assert style.lookup("TEntry", "background") == "#383838"
+        assert app.listbox.cget("bg") == "#2d2d2d"
+        assert lum(root, style.lookup("TEntry", "fieldbackground")) > lum(
+            root, app.listbox.cget("bg")
+        )
+    finally:
+        app.root.destroy()
+
+
+def test_entry_fill_and_listbox_light(tmp_path):
+    from tkinter import ttk
+
+    _write_config(tmp_path, "light")
+    app = _build_app(tmp_path)
+    try:
+        root = app.root
+        root.update()
+        style = ttk.Style(root)
+
+        # Light palette: entries and listbox both stay white.
+        assert style.lookup("TEntry", "fieldbackground") == "#ffffff"
+        assert app.listbox.cget("bg") == "#ffffff"
+    finally:
+        app.root.destroy()
+
+
 def test_migration_from_legacy_config(tmp_path):
     # Legacy theme file inside the lists dir.
     legacy = tmp_path / "config.json"
