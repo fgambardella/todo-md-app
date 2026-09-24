@@ -95,4 +95,4 @@ At the end of every implementation cycle, you must evaluate if the project's REA
   3. **Size Limit (Compaction):** continuously monitor the file's growth. IF the document exceeds the 3,000-word threshold, you must run a "compaction." Summarize and condense the most descriptive or feature-heavy sections to bring the word count back under the limit, while strictly respecting the Immutable Sections rule.
   
 ### Temp directory hygiene
-At the end of every implementation cycle start a cleanup of the file created in the `/tmp` directory, like: `/tmp/pi_implementer_output.log`.
+At the end of every implementation cycle start a cleanup of the files you created in the `/tmp` directory, like: `/tmp/pi_implementer_output.log`.
