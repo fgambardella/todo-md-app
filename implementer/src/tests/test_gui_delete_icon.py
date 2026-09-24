@@ -21,7 +21,7 @@ def test_delete_control_is_trash_icon_label(tmp_path):
     with open(icon_path, "rb") as fh:
         assert fh.read(4) == b"\x89PNG"
 
-    app = TodoApp(controller)
+    app = TodoApp(controller, config_dir=str(tmp_path / "config"))
     try:
         app.root.update()
         app._select_list_name("Del")

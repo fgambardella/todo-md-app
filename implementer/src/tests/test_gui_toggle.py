@@ -26,7 +26,7 @@ def test_toggle_updates_gui(tmp_path):
     controller.add_item("test-list", "first item")
     controller.add_item("test-list", "second item")
 
-    app = TodoApp(controller)
+    app = TodoApp(controller, config_dir=str(tmp_path / "config"))
     try:
         app.root.update()
         app._select_list_name("test-list")

@@ -21,7 +21,7 @@ def test_label_foreground_adapts_to_background(tmp_path):
     controller.add_item("Contrast", "Beta")
     controller.toggle_item("Contrast", 1)  # Beta is done
 
-    app = TodoApp(controller)
+    app = TodoApp(controller, config_dir=str(tmp_path / "config"))
     try:
         root = app.root
         app._select_list_name("Contrast")

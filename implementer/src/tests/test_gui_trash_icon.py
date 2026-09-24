@@ -15,7 +15,7 @@ def test_trash_icon_size_transparency_and_click(tmp_path):
     controller.add_item("Trash", "Alpha")
     controller.add_item("Trash", "Beta")
 
-    app = TodoApp(controller)
+    app = TodoApp(controller, config_dir=str(tmp_path / "config"))
     try:
         app.root.update()
         app._select_list_name("Trash")

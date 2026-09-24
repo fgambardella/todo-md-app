@@ -11,7 +11,7 @@ def test_delete_item_removes_from_ui_and_file(tmp_path):
     controller.add_item("X", "first")
     controller.add_item("X", "second")
 
-    app = TodoApp(controller)
+    app = TodoApp(controller, config_dir=str(tmp_path / "config"))
     try:
         app.root.update()
         app._select_list_name("X")

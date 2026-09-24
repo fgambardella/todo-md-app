@@ -11,7 +11,7 @@ import os
 
 from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
-from .theme import load_theme, save_theme  # headless module (stdlib only)
+from .theme import load_theme, migrate_legacy_config, save_theme  # headless module (stdlib only)
 
 __all__ = ["TodoController", "TodoApp", "run"]
 
@@ -109,12 +109,22 @@ class TodoApp:
     """
 
     def __init__(
-        self, controller: TodoController, data_dir: str | None = None
+        self,
+        controller: TodoController,
+        data_dir: str | None = None,
+        config_dir: str | None = None,
     ) -> None:
         import tkinter as tk  # lazy: keep module importable headless
 
         self.controller = controller
         self.data_dir = data_dir if data_dir is not None else self.controller.store.data_dir
+        # Theme settings live in a dedicated config dir alongside (not inside)
+        # the lists dir; default: <lists-parent>/config.
+        self.config_dir = (
+            config_dir
+            if config_dir is not None
+            else os.path.join(os.path.dirname(os.path.abspath(self.data_dir)), "config")
+        )
         self.current_list: str | None = None
         self._item_rows: list[tuple] = []
         self._palette: dict | None = None
@@ -124,9 +134,13 @@ class TodoApp:
         self.root.geometry("700x420")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # Theme: load (first start creates config.json) and apply before
-        # the UI is built so every widget starts in the right palette.
-        self.theme = load_theme(self.data_dir)
+        # Theme: one-time migration of the legacy <lists>/config.json, then
+        # load (first start creates settings.json) and apply before the UI
+        # is built so every widget starts in the right palette.
+        migrate_legacy_config(
+            self.config_dir, os.path.join(os.path.abspath(self.data_dir), "config.json")
+        )
+        self.theme = load_theme(self.config_dir)
         self._apply_theme(self.theme)
 
         # Cached trash-bin icon (~18px after subsampling the 512x512 source).
@@ -243,7 +257,7 @@ class TodoApp:
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"
-        save_theme(self.data_dir, new)
+        save_theme(self.config_dir, new)
         self.theme = new
         self._apply_theme(new)
         self._theme_btn.config(text=self._theme_button_text())
