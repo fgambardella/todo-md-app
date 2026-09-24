@@ -243,7 +243,15 @@ class TodoApp:
         style.configure("TFrame", background=bg, foreground=fg)
         style.configure("TLabel", background=bg, foreground=fg)
         style.configure("TButton", background=btn_bg, foreground=fg)
-        style.configure("TEntry", background=entry_bg, foreground=fg)
+        # The clam TEntry field element consumes the *element* option
+        # fieldbackground for its fill; background/foreground alone leave
+        # a light field in dark mode, making light text invisible.
+        style.configure(
+            "TEntry",
+            background=entry_bg,
+            foreground=fg,
+            fieldbackground=entry_bg,
+        )
         self.root.config(bg=bg)
 
         # Plain tk widgets inherit the *parent's effective* background;

@@ -117,6 +117,52 @@ def test_label_readability_after_switch(tmp_path):
         app.root.destroy()
 
 
+def test_tentry_field_fill_follows_theme(tmp_path):
+    from tkinter import ttk
+
+    _write_config(tmp_path, "light")
+    app = _build_app(tmp_path)
+    try:
+        root = app.root
+        root.update()
+
+        def field_lum():
+            style = ttk.Style(root)
+            return lum(root, style.lookup("TEntry", "fieldbackground"))
+
+        # light (fresh start)
+        assert app.theme == "light"
+        assert field_lum() > 0.5
+
+        # light -> dark (toggle)
+        app._on_toggle_theme()
+        root.update()
+        assert app.theme == "dark"
+        assert field_lum() < 0.5
+
+        # dark -> light (toggle back)
+        app._on_toggle_theme()
+        root.update()
+        assert app.theme == "light"
+        assert field_lum() > 0.5
+    finally:
+        app.root.destroy()
+
+
+def test_tentry_field_fill_dark_startup(tmp_path):
+    from tkinter import ttk
+
+    _write_config(tmp_path, "dark")
+    app = _build_app(tmp_path)
+    try:
+        root = app.root
+        root.update()
+        style = ttk.Style(root)
+        assert lum(root, style.lookup("TEntry", "fieldbackground")) < 0.5
+    finally:
+        app.root.destroy()
+
+
 def test_migration_from_legacy_config(tmp_path):
     # Legacy theme file inside the lists dir.
     legacy = tmp_path / "config.json"
