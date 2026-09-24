@@ -55,7 +55,7 @@ cd src
 .venv/bin/python -m pytest tests -v
 ```
 
-Expected: 51 passing tests across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_theme.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, and `test_gui_theme.py`.
+Expected: 61 passing tests across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_theme.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, `test_gui_theme.py`, and `test_gui_hover.py`.
 
 ## Running the app
 
