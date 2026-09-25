@@ -199,23 +199,3 @@ def test_entry_fill_and_listbox_light(tmp_path):
         assert app.listbox.cget("bg") == "#ffffff"
     finally:
         app.root.destroy()
-
-
-def test_migration_from_legacy_config(tmp_path):
-    # Legacy theme file inside the lists dir.
-    legacy = tmp_path / "config.json"
-    legacy.write_text('{"theme": "dark"}', encoding="utf-8")
-
-    store = MarkdownListStore(str(tmp_path))
-    controller = TodoController(store)
-    app = TodoApp(
-        controller, config_dir=str(tmp_path / "config")
-    )
-    try:
-        assert app.theme == "dark"
-        new_path = tmp_path / "config" / "settings.json"
-        assert new_path.is_file()
-        assert json.loads(new_path.read_text(encoding="utf-8")) == {"theme": "dark"}
-        assert not legacy.exists(), "legacy config.json must be deleted after migration"
-    finally:
-        app.root.destroy()

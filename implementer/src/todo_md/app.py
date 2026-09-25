@@ -11,7 +11,7 @@ import os
 
 from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
-from .theme import load_theme, migrate_legacy_config, save_theme  # headless module (stdlib only)
+from .theme import load_theme, save_theme  # headless module (stdlib only)
 
 __all__ = ["TodoController", "TodoApp", "run"]
 
@@ -134,12 +134,8 @@ class TodoApp:
         self.root.geometry("700x420")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-        # Theme: one-time migration of the legacy <lists>/config.json, then
-        # load (first start creates settings.json) and apply before the UI
-        # is built so every widget starts in the right palette.
-        migrate_legacy_config(
-            self.config_dir, os.path.join(os.path.abspath(self.data_dir), "config.json")
-        )
+        # Theme: load (first start creates settings.json) and apply before
+        # the UI is built so every widget starts in the right palette.
         self.theme = load_theme(self.config_dir)
         self._apply_theme(self.theme)
 

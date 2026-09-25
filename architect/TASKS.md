@@ -18,7 +18,7 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 - Headless controller: create/delete lists and add/toggle/remove items; every mutation is persisted to disk immediately.
 - GUI: list sidebar with create/delete, checkbutton item rows, entry to add items, per-item trash-icon delete control; the new-list entry also creates the list on Enter.
 - Readability: item label foreground adapts to the effective background luminance, readable in both light and dark; entry field fills follow the palette in both themes (via the clam `fieldbackground` element option), so entry text stays legible. In dark mode they sit slightly lighter than the list widget background (identical colors read darker optically).
-- Theming: persisted light/dark setting with macOS system-default detection on first start; theme switcher applied at startup and on toggle, persisted to `~/.todo-md-app/config/settings.json` (one-time migration from legacy `<lists>/config.json`).
+- Theming: persisted light/dark setting with macOS system-default detection on first start; theme switcher applied at startup and on toggle, persisted to `~/.todo-md-app/config/settings.json`.
 - Theme switches flip the whole window including item rows in both directions; buttons use a slightly darker hover/press fill in both themes for readable text.
 
 ## Active Task

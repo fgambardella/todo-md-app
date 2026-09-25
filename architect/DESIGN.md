@@ -8,7 +8,7 @@ Architect-owned compact snapshot of the current architecture. Not a journal; his
 - Every list is persisted as its own plain Markdown file with GFM checkbox syntax — no database.
 - Layered: domain models → Markdown storage → headless controller (view-model) → Tkinter GUI; all business logic testable without a display.
 - Testing: pytest; full suite `.venv/bin/python -m pytest tests -v` from `implementer/src` (system Python is PEP-668 managed).
-- App data lives in `~/.todo-md-app/lists/` (one `.md` per list); the theme setting lives in a dedicated `~/.todo-md-app/config/settings.json` (one-time migration from the legacy `<lists>/config.json`).
+- App data lives in `~/.todo-md-app/lists/` (one `.md` per list); the theme setting lives in a dedicated `~/.todo-md-app/config/settings.json`.
 - Primary target OS: macOS; system theme detection via `defaults read -g AppleInterfaceStyle` with graceful fallback.
 
 ## Component Architecture
@@ -28,7 +28,7 @@ implementer/src/
 
 - **Domain** — `todo_md/models.py`: `TodoItem(text, done, created)`, `TodoList(name, items)` with validated add/toggle/remove/rename.
 - **Persistence** — `todo_md/storage.py`: `MarkdownListStore(data_dir)`; atomic writes (temp file + `os.replace`); names sanitized to `[A-Za-z0-9_-]`; `lists()` picks up `.md` files only.
-- **Theme config** — `todo_md/theme.py`: headless (no tkinter); system-default detection; atomic JSON load/save of `settings.json` in a config dir; validates against `("light", "dark")`; `migrate_legacy_config` performs the one-time legacy `<lists>/config.json` migration.
+- **Theme config** — `todo_md/theme.py`: headless (no tkinter); system-default detection; atomic JSON load/save of `settings.json` in a config dir; validates against `("light", "dark")`.
 - **View-model** — `todo_md/app.py` (`TodoController`): bridges models and storage; every mutation persists immediately; no tkinter at module import.
 - **Presentation** — `todo_md/app.py` (`TodoApp`): list sidebar (create/delete), checkbutton item rows with luminance-adaptive label colors, per-row trash-icon delete (`tk.Label` + bound `<Button-1>`, `.subsample(28)` → ~18px), entry+Add, theme switcher button. `_apply_theme` tries `tk appappearance`, falls back to ttk "clam" + explicit palettes stored in `self._palette` on `TclError`; `_refresh_items` applies the palette bg to every row widget.
 - **Entry point** — `todo_md/__main__.py`: `run()` builds controller + GUI.
@@ -38,7 +38,7 @@ implementer/src/
 - `TodoItem(text: str, done: bool, created: float)`; `TodoList(name: str, items: list[TodoItem])`.
 - Disk: `<lists>/<Name>.md` = `# <Name>` header + `- [ ]`/`- [x]` lines; plus the theme setting JSON `{"theme": "light"|"dark"}` at `<app-root>/config/settings.json` (config dir sits alongside, never inside, the lists dir).
 - Data flow: GUI → `TodoController` → `MarkdownListStore` → `.md` files; store re-read after each mutation drives UI refresh.
-- Theme flow: startup → `migrate_legacy_config` (one-time legacy `<lists>/config.json`) → `load_theme` (first start: detect system default and persist) → `_apply_theme` → build UI → idempotent re-apply after `_build_ui` so the palette reaches built widgets. Toggle → `save_theme` (to `config_dir`) → re-apply → `_refresh_items` (row bgs + adaptive label fgs re-resolve).
+- Theme flow: startup → `load_theme` (first start: detect system default and persist) → `_apply_theme` → build UI → idempotent re-apply after `_build_ui` so the palette reaches built widgets. Toggle → `save_theme` (to `config_dir`) → re-apply → `_refresh_items` (row bgs + adaptive label fgs re-resolve).
 
 ## External Interfaces
 

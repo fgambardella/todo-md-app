@@ -18,7 +18,6 @@ __all__ = [
     "system_default_theme",
     "load_theme",
     "save_theme",
-    "migrate_legacy_config",
 ]
 
 SETTINGS_FILENAME = "settings.json"
@@ -88,28 +87,3 @@ def save_theme(config_dir: str, theme: str) -> None:
     if theme not in VALID_THEMES:
         raise ValueError(f"invalid theme: {theme!r} (expected one of {VALID_THEMES})")
     _write_atomic(config_dir, json.dumps({"theme": theme}))
-
-
-def migrate_legacy_config(config_dir: str, legacy_path: str) -> None:
-    """One-time migration of the legacy ``<lists>/config.json`` theme file.
-
-    If ``legacy_path`` exists and ``<config_dir>/settings.json`` does not
-    yet, the legacy file is read; when it parses and its ``theme`` value
-    is valid, ``{"theme": t}`` is atomically written to the new file and
-    the legacy file is deleted. A corrupt or invalid legacy file is left
-    in place untouched. Never touches list ``.md`` files.
-    """
-    if not os.path.isfile(legacy_path):
-        return
-    if os.path.isfile(_settings_path(config_dir)):
-        return
-    try:
-        with open(legacy_path, "r", encoding="utf-8") as fh:
-            data = json.load(fh)
-        theme = data["theme"]
-        if theme not in VALID_THEMES:
-            return
-    except (OSError, ValueError, KeyError, TypeError):
-        return
-    _write_atomic(config_dir, json.dumps({"theme": theme}))
-    os.remove(legacy_path)
