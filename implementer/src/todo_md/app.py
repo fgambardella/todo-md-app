@@ -171,6 +171,7 @@ class TodoApp:
 
         self.new_name_entry = ttk.Entry(left, width=20)
         self.new_name_entry.pack(fill=tk.X)
+        self.new_name_entry.bind("<Return>", lambda _e: self._on_create_list())
 
         btn_row = ttk.Frame(left)
         btn_row.pack(fill=tk.X, pady=(6, 0))
