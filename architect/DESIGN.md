@@ -20,15 +20,20 @@ implementer/src/
 │   ├── models.py       # Domain: TodoItem, TodoList
 │   ├── storage.py      # Persistence: MarkdownListStore
 │   ├── theme.py        # Headless theme config (load/save/system detection)
+│   ├── version.py      # Headless version loader (get_version, reads VERSION)
 │   ├── app.py          # TodoController (headless) + TodoApp (tkinter GUI)
 │   ├── __main__.py     # Entry point: python -m todo_md
+│   ├── VERSION         # App version (X.Y.Z), auto-bumped by git pre-commit hook
 │   └── assets/         # trash.png (512×512, CC-BY 4.0) + LICENSE.txt
 └── tests/              # pytest suite (GUI tests run on a real display here)
 ```
 
+Repo-level: `implementer/scripts/bump_version.sh` (+ `--install-hook`) maintains `.git/hooks/pre-commit`, which bumps the PATCH of `VERSION` and stages it into every commit; the hook is git-internal and must be (re)installed per clone.
+
 - **Domain** — `todo_md/models.py`: `TodoItem(text, done, created)`, `TodoList(name, items)` with validated add/toggle/remove/rename.
 - **Persistence** — `todo_md/storage.py`: `MarkdownListStore(data_dir)`; atomic writes (temp file + `os.replace`); names sanitized to `[A-Za-z0-9_-]`; `lists()` picks up `.md` files only.
 - **Theme config** — `todo_md/theme.py`: headless (no tkinter); system-default detection; atomic JSON load/save of `settings.json` in a config dir; validates against `("light", "dark")`.
+- **Version** — `todo_md/version.py`: headless `get_version()` reads `todo_md/VERSION` package-relative, returns `0.0.0` if missing/unreadable. `TodoApp` shows `v<version>` in a bottom-right `tk.Label` (font 8, `version_fg` palette entry, unobtrusive).
 - **View-model** — `todo_md/app.py` (`TodoController`): bridges models and storage; every mutation persists immediately; no tkinter at module import.
 - **Presentation** — `todo_md/app.py` (`TodoApp`): list sidebar (create/delete), checkbutton item rows with luminance-adaptive label colors, per-row trash-icon delete (`tk.Label` + bound `<Button-1>`, `.subsample(28)` → ~18px), entry+Add, theme switcher button. `_apply_theme` tries `tk appappearance`, falls back to ttk "clam" + explicit palettes stored in `self._palette` on `TclError`; `_refresh_items` applies the palette bg to every row widget.
 - **Entry point** — `todo_md/__main__.py`: `run()` builds controller + GUI.
@@ -42,7 +47,8 @@ implementer/src/
 
 ## External Interfaces
 
-- **CLI**: `python -m todo_md` (from `implementer/src`, using the venv).
+- **CLI**: `python -m todo_md` (from `implementer/src`, using the venv); `implementer/src/scripts/bump_version.sh [--install-hook]` (from repo root).
+- **Git**: installed pre-commit hook bumps `todo_md/VERSION` (patch) and stages it in every commit — every commit therefore carries a version bump.
 - **Disk**: `~/.todo-md-app/lists/*.md` + theme setting JSON at `~/.todo-md-app/config/settings.json` (UTF-8, key `theme`).
 - **OS**: macOS `defaults read -g AppleInterfaceStyle` (dark → "dark"; non-macOS or error → "light").
 - **Tk/Tcl**: on this machine (Tcl/Tk 9.0.4) `tk appappearance` raises `TclError` (clam fallback is always live), `compound="image"` is rejected (use `"center"`), and the clam `TEntry` field element fills from the `fieldbackground` element option — setting `background` alone leaves a light field in dark mode; clam `TButton` likewise needs an explicit `style.map("TButton", background=[("active", …)])` or hover falls back to a light `activeBackground` that hides light text. Dark-mode entry fill (`#383838`) is deliberately slightly lighter than the listbox background (`#2d2d2d`): identical colors read as entries looking darker (optical effect).
