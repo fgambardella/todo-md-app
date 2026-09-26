@@ -77,6 +77,7 @@ Handoff must end with: RESULT: SUCCESS or RESULT: FAILURE; BRANCH: implementer/t
 
 ## Queue
 
+- Fix a GUI bug: after creating a todo item or a new list by typing the name and pressing enter, in the input field the typed text is replaced by the palceholder text that doesn't diappear when you start typing again, because the focus is already on the input field. You need to implement a check so that if the focus is already on the input field no plecholder text in added into the field.
 - Implement a build script in bash/zsh that builds the application in a self contained executable file for MacOS (Apple Silicon/arm64). Update 'README.md' file with precise instructions on how to use that script.
 - Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it.
 
