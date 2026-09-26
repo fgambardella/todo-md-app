@@ -12,6 +12,7 @@ import os
 from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
 from .theme import load_theme, save_theme  # headless module (stdlib only)
+from .version import get_version  # headless module (no tkinter)
 
 __all__ = ["TodoController", "TodoApp", "run"]
 
@@ -156,6 +157,20 @@ class TodoApp:
         import tkinter as tk
         from tkinter import ttk
 
+        # --- version badge: bottom-right, unobtrusive --------------------
+        # Packed first (side=bottom) so the left/right frames fill only the
+        # remaining space and the existing layout is undisturbed.
+        # Unset background inherits the root background and flips with it.
+        version_fg = (self._palette or {}).get("version_fg", "#808080")
+        self.version_label = tk.Label(
+            self.root,
+            text=f"v{get_version()}",
+            font=("", 8),
+            foreground=version_fg,
+            padx=8,
+        )
+        self.version_label.pack(side=tk.BOTTOM, anchor="e")
+
         # --- left frame: lists ------------------------------------------
         left = ttk.Frame(self.root, padding=8)
         left.pack(side=tk.LEFT, fill=tk.Y)
@@ -243,6 +258,8 @@ class TodoApp:
             "btn_bg": btn_bg,
             "entry_bg": entry_bg,
             "list_bg": list_bg,
+            # Low-contrast badge color: legible but unobtrusive on bg.
+            "version_fg": "#555555" if theme == "dark" else "#9a9a9a",
         }
 
         style = ttk.Style(self.root)
@@ -282,6 +299,9 @@ class TodoApp:
         listbox = getattr(self, "listbox", None)
         if listbox is not None:
             listbox.config(bg=list_bg, fg=fg, highlightbackground=btn_bg)
+        version_label = getattr(self, "version_label", None)
+        if version_label is not None:
+            version_label.config(foreground=self._palette["version_fg"])
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"
