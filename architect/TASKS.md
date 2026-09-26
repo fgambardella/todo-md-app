@@ -25,48 +25,7 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-**Task 23 (S)** — Make placeholder focus tests deterministic (corrective follow-up to task 22)
-- Branch: `implementer/task-23-deterministic-focus-tests` (base and integration branch: `main`)
-- Background: task 22 merged (7a7d599), but post-merge the full suite shows 2 failures in `tests/test_gui_placeholders.py` (`test_focus_in_clears_placeholder`, `test_focus_out_on_empty_entry_restores_placeholder`): they rely on `focus_set()` generating real WM FocusIn events, which do not fire when the test window is not the active application. The production placeholder behavior is correct; the tests are unreliable.
-- Scope: `implementer/src/tests/test_gui_placeholders.py` (fix focus simulation); also harden any real-focus reliance in `implementer/src/tests/test_gui_new_list.py` with the same technique. No production-code changes unless a test proves a real bug (if so, report it instead of patching around it).
-- Acceptance criteria:
-  1. Focus in/out is simulated deterministically via `entry.event_generate("<FocusIn>")` / `entry.event_generate("<FocusOut>")` (with `app.root.update()` after), not via `focus_set`/`focus_force`.
-  2. All six placeholder tests pass; `test_gui_new_list.py` passes.
-  3. Full suite passes twice in a row consecutively.
-- Commands (from `implementer/src`):
-  - `.venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v`
-  - `.venv/bin/python -m pytest tests -q` (run twice)
-
-Prompt for the Implementer:
-```
-You are the Implementer. Base/integration branch: `main`. Your assigned implementation branch is `implementer/task-23-deterministic-focus-tests` (already checked out).
-
-Task 23 (S): make the placeholder focus tests deterministic (corrective follow-up to task 22).
-
-Background: task 22 (input placeholders) was merged, but post-merge the full suite fails 2 tests in implementer/src/tests/test_gui_placeholders.py: test_focus_in_clears_placeholder and test_focus_out_on_empty_entry_restores_placeholder. They call focus_set() and rely on the window manager emitting real FocusIn/FocusOut events; those events do not fire when the test window is not the active application, so the assertions see the placeholder still present. The production behavior in todo_md/app.py is believed correct — this is test unreliability, not a product bug.
-
-Before editing: verify the current branch is `implementer/task-23-deterministic-focus-tests` and `git status --short` is clean; if not, stop and report.
-
-Scope — you may modify ONLY:
-- implementer/src/tests/test_gui_placeholders.py
-- implementer/src/tests/test_gui_new_list.py (only to remove real-focus reliance, same technique)
-No production-code changes. If a test exposes a genuine production bug, do NOT work around it: stop and report it.
-Do not change anything outside implementer/src/. Changes anywhere under architect/ or at the repository root are forbidden.
-
-Requirements:
-1. In test_gui_placeholders.py, simulate focus deterministically: entry.event_generate("<FocusIn>") / entry.event_generate("<FocusOut>") followed by app.root.update(), instead of focus_set()/focus_force(). Keep every existing assertion intact.
-2. In test_gui_new_list.py, replace focus_force()-based focus reliance with the same event_generate technique where it matters (the list-creation flow itself still uses event_generate("<Return>")).
-3. Keep the tests fast and self-contained (destroy root in finally).
-
-Run from implementer/src:
-- .venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v
-- .venv/bin/python -m pytest tests -q
-- run the full suite a second time back-to-back to confirm stability
-
-Commit your work to `implementer/task-23-deterministic-focus-tests`. Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to `main`, broad staging or destructive working-tree operations.
-
-Handoff must end with: RESULT: SUCCESS or RESULT: FAILURE; BRANCH: implementer/task-23-deterministic-focus-tests; COMMIT: <full commit hash>; one-line test summary (include both full-suite runs); blockers if any.
-```
+None.
 
 ## Queue
 
@@ -80,8 +39,8 @@ None.
 
 ## Recently Completed
 
-- Task 22 — input placeholders: muted-gray hints on both entries (placeholder_fg), cleared on focus-in, restored on empty focus-out, counted as empty on submit; new `test_gui_placeholders.py` + minimal `test_gui_new_list.py` contract alignment; merged (3c26e92); post-merge flaky real-focus tests being fixed in Task 23.
+- Task 23 — deterministic focus tests: placeholder/new-list GUI tests use `event_generate("<FocusIn>")`/`"<FocusOut>"` instead of WM focus (fixes post-merge flakiness); after one child timeout, completed from uncommitted checkpoint; two consecutive 73/73 runs; merged (0c46f37).
+- Task 22 — input placeholders: muted-gray hints on both entries (placeholder_fg), cleared on focus-in, restored on empty focus-out, counted as empty on submit; new `test_gui_placeholders.py` + minimal `test_gui_new_list.py` contract alignment; merged (3c26e92).
 - Task 21 — version badge colors: fallback-path label bg pinned to window palette bg, muted-gray fg in both themes, bg+fg refreshed on toggle; new `test_gui_version_colors.py`; verified, merged (4c03028).
 - Task 20 — Yes/No confirmation popups (messagebox.askyesno) gate both delete-list and delete-item GUI handlers; No = full no-op; verified, merged (8d07a84).
 - Task 19 — versioning: `bump_version.sh` + pre-commit hook auto-increments `todo_md/VERSION` (patch); headless `get_version()`; bottom-right GUI version badge; verified, merged (4fd69737, at VERSION 0.1.3).
-- Task 18 — Enter in new-list entry creates the list (Return bind on `new_name_entry` + `test_gui_new_list.py`): verified, merged (82d5271).
