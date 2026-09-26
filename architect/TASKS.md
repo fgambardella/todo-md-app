@@ -25,11 +25,58 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None.
+**Task 24 (S)** — Custom macOS dock icon
+- Branch: `implementer/task-24-dock-icon` (base and integration branch: `main`; not yet created)
+- Scope: `implementer/src/todo_md/app.py` (dock icon wiring); new PNG asset derived from `implementer/src/todo_md/assets/dock_icon.jpg` (450x450 JPEG, keep the original jpg); new `implementer/src/tests/test_gui_dock_icon.py`.
+- Technical notes: Tk `PhotoImage` cannot decode JPEG natively, so a PNG version of the icon must be produced once (e.g. macOS `sips -s format png`) and committed alongside the jpg. On macOS, `root.iconphoto(True, photo)` sets the app's dock icon; the `PhotoImage` must be kept alive in an instance attribute to avoid GC. Runtime stays stdlib-only.
+- Acceptance criteria:
+  1. `TodoApp` loads a PNG dock icon package-relative (via the `todo_md` package path, like other assets) and applies it with `root.iconphoto(True, photo)`, storing the reference on the instance.
+  2. The PNG asset exists in `todo_md/assets/` and is a valid multi-color PNG derived from the provided jpg (lossless format conversion, no redesign).
+  3. A missing/unreadable icon must not break app startup (fail soft: skip `iconphoto`, app runs normally).
+  4. No changes to theme, layout, or behavior beyond the icon wiring.
+- Required tests: the PNG asset loads as a `PhotoImage` with width and height > 0; `TodoApp` stores the icon reference and `iconphoto` is applied without error (icon set at startup); a corrupted/missing icon path (simulated) leaves the app functional.
+- Commands (from `implementer/src`):
+  - `.venv/bin/python -m pytest tests/test_gui_dock_icon.py -v`
+  - `.venv/bin/python -m pytest tests -v`
+
+Prompt for the Implementer:
+```
+You are the Implementer. Base/integration branch: `main`. Your assigned implementation branch is `implementer/task-24-dock-icon` (already checked out).
+
+Task 24 (S): use a custom macOS dock icon.
+
+Context: the icon source is implementer/src/todo_md/assets/dock_icon.jpg (450x450 JPEG). Tk PhotoImage cannot decode JPEG natively, so generate a PNG version once using macOS `sips -s format png` (or equivalent lossless format conversion) and commit it as implementer/src/todo_md/assets/dock_icon.png; keep the original jpg. On macOS, `root.iconphoto(True, photo)` sets the app's dock icon; keep the PhotoImage alive in an instance attribute. Runtime stays stdlib-only (no Pillow or other deps).
+
+Before editing: verify the current branch is `implementer/task-24-dock-icon` and `git status --short` is clean; if not, stop and report.
+
+Scope — you may modify/create ONLY:
+- implementer/src/todo_md/app.py
+- implementer/src/todo_md/assets/dock_icon.png (new, derived from the existing jpg)
+- implementer/src/tests/test_gui_dock_icon.py (new)
+Do not change anything outside implementer/src/. Changes anywhere under architect/ or at the repository root are forbidden.
+
+Requirements:
+1. TodoApp loads the PNG dock icon package-relative (resolve the path via the todo_md package location, like other assets) and applies it with self.root.iconphoto(True, photo) at startup; store the PhotoImage on self (e.g. self._dock_icon) so it is not garbage-collected.
+2. The PNG is a faithful format conversion of the provided jpg (no resizing beyond what sips does by default is required; keep it simple, e.g. original 450x450).
+3. Fail soft: if the icon file is missing or unreadable, catch the error, skip iconphoto, and the app must start and run normally.
+4. No other behavior changes (themes, layout, handlers untouched).
+
+Tests (new file tests/test_gui_dock_icon.py; GUI tests on a real display: destroy root in finally, call root.update() after building):
+- the PNG asset loads as a tk.PhotoImage with width() > 0 and height() > 0;
+- building TodoApp leaves the icon reference stored on the instance and iconphoto applied without error (the app can assert the stored reference is a PhotoImage with non-zero size);
+- with the icon path simulated to a missing file (monkeypatch the path resolution or the asset lookup used by TodoApp), TodoApp still builds and the app is usable (no exception, root alive), with no stored icon reference.
+
+Run from implementer/src:
+- .venv/bin/python -m pytest tests/test_gui_dock_icon.py -v
+- .venv/bin/python -m pytest tests -v
+
+Commit your work to `implementer/task-24-dock-icon`. Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to main, broad staging or destructive working-tree operations.
+
+Handoff must end with: RESULT: SUCCESS or RESULT: FAILURE; BRANCH: implementer/task-24-dock-icon; COMMIT: <full commit hash>; one-line test summary; blockers if any.
+```
 
 ## Queue
 
-- Now the application is shown with a standard icon in the MacOS dock, but I want it uses the following image: 'implementer/src/todo_md/assets/dock_icon.jpg'
 - Implement a build script in bash/zsh that builds the application in a self contained executable file for MacOS (Apple Silicon/arm64). Update 'README.md' file with precise instructions on how to use that script.
 - Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it.
 
