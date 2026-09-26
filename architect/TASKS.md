@@ -28,6 +28,7 @@ None.
 
 ## Queue
 
+- Resolve a GUI bug from task 19: in light mode the background color of the version display component is dark. Fix it by making it the same color of the main window's backgroud and make the text color of the version a visible gray color, but quite toned down so as not to distract.
 - Add placeholders in all input fields, explaining what that field is supposed to contain: like 'Insert the name of a new list here' or 'Add a new todo item here'. Important: those placeholders must disappear as soon as the user put the focus on it.
 - Now the application is shown with a standard icon in the MacOS dock, but I want it uses the following image: 'implementer/src/todo_md/assets/dock_icon.jpg'
 - Implement a build script in bash/zsh that builds the application in a self contained executable file for MacOS (Apple Silicon/arm64). Update 'README.md' file with precise instructions on how to use that script.
