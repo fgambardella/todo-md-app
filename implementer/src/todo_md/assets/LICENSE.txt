@@ -1,5 +1,11 @@
 Asset: trash.png
-- File: trash.png
+- File: assets/trash.png
 - Source: https://www.flaticon.com/free-icons/garbage
 - License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 - Attribution: "Garbage icons created by kumakamu - Flaticon"
+
+Asset: dock_icon.jpg
+- File: assets/dock_icon.jpg
+- Source: https://www.freestock.com/
+- License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+- Attribution: ""

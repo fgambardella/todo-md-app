@@ -27,7 +27,12 @@ None.
 
 ## Queue
 
-None.
+- Implement a versioning system so that it uses a script triggered by git commit hook: it must increment the version in a file. Start with v0.1.0. The application must dynamically load the version from that file and show it in the bottom right corner in a not invasive way (small font and low contrast color).
+- Now the delete list and delete todo item actions proceed without asking any confirmation to the user: it is dangerous and I want you implement a popup confirmation window (message + yes/no buttons) for both use cases.
+- Add placeholders in all input fields, explaining what that field is supposed to contain: like 'Insert the name of a new list here' or 'Add a new todo item here'. Important: those placeholders must disappear as soon as the user put the focus on it.
+- Now the application is shown with a standard icon in the MacOS dock, but I want it uses the following image: 'implementer/src/todo_md/assets/dock_icon.jpg'
+- Implement a build script in bash/zsh that builds the application in a self contained executable file for MacOS (Apple Silicon/arm64). Update 'README.md' file with precise instructions on how to use that script.
+- Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it.
 
 ## Active Blockers
 
