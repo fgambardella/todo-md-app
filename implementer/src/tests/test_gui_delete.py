@@ -1,5 +1,7 @@
 """GUI test: deleting an item via the row's delete button updates UI and .md file."""
 
+from unittest.mock import patch
+
 from todo_md.app import TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
 
@@ -28,9 +30,12 @@ def test_delete_item_removes_from_ui_and_file(tmp_path):
             assert str(delete_button.cget("image"))
             assert str(delete_button.cget("text")) not in ("x", "X")
 
-        # Delete the first item
-        app._on_delete_item(0)
+        # Delete the first item (confirmation answered Yes)
+        with patch("tkinter.messagebox.askyesno", return_value=True) as ask:
+            app._on_delete_item(0)
         app.root.update()
+
+        ask.assert_called_once_with("Confirm deletion", 'Delete item "first"?')
 
         assert len(app._item_rows) == 1
         assert app._item_rows[0][2].cget("text") == "second"

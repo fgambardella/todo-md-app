@@ -16,7 +16,7 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 - Markdown persistence: each list stored as its own `.md` file with GFM checkboxes, atomic writes, filename-safe list names.
 - Domain layer: validated add, toggle, remove, and rename of items with clear errors for empty text or bad indexes.
 - Headless controller: create/delete lists and add/toggle/remove items; every mutation is persisted to disk immediately.
-- GUI: list sidebar with create/delete, checkbutton item rows, entry to add items, per-item trash-icon delete control; the new-list entry also creates the list on Enter.
+- GUI: list sidebar with create/delete, checkbutton item rows, entry to add items, per-item trash-icon delete control; the new-list entry also creates the list on Enter. Destructive actions (delete list, delete item) require a modal Yes/No confirmation before anything is removed.
 - Readability: item label foreground adapts to the effective background luminance, readable in both light and dark; entry field fills follow the palette in both themes (via the clam `fieldbackground` element option), so entry text stays legible. In dark mode they sit slightly lighter than the list widget background (identical colors read darker optically).
 - Theming: persisted light/dark setting with macOS system-default detection on first start; theme switcher applied at startup and on toggle, persisted to `~/.todo-md-app/config/settings.json`.
 - Theme switches flip the whole window including item rows in both directions; buttons use a slightly darker hover/press fill in both themes for readable text.
@@ -24,19 +24,7 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-- **ID/Title:** Task 20 — Confirmation popups for destructive actions.
-- **Branch:** `implementer/20-delete-confirmations` (base `main`; integrate back into `main`).
-- **Scope:** In `TodoApp` (src/todo_md/app.py) only, guard both destructive actions with a modal confirmation popup before executing: (1) deleting a list (the existing delete-list path in the sidebar), (2) deleting a todo item (the existing per-row trash-icon handler). Use `tkinter.messagebox.askyesno` (or `yesno`) with a clear message naming the target, e.g. list: "Delete list '<name>' and all of its items?" / item: "Delete item '<text>'?"; title like "Confirm deletion". Only proceed with the controller mutation when the user answers Yes; on No do nothing. Do NOT change controller/storage/domain behavior — the guard lives in the GUI handlers.
-- **Acceptance criteria:**
-  1. Neither delete action performs its mutation without a Yes answer (mock/patch `messagebox.askyesno` to return False → no controller call, no UI change, no file change).
-  2. On Yes, behavior is identical to before (mutation + refresh).
-  3. Message text names the list name / item text being deleted.
-  4. Full suite green, including existing delete tests (update existing GUI delete tests if they click through without the dialog — patch `askyesno` to return True where a real delete is intended).
-- **Required tests:** update `tests/test_gui_delete.py`, `tests/test_gui_delete_icon.py`, `tests/test_gui_trash_icon.py` (and any other affected) to patch the confirmation; add assertions that No → nothing happens (new test case, e.g. in `tests/test_gui_delete.py` or a new `tests/test_gui_confirm.py`):
-  - list delete with No → list still on disk + still in sidebar;
-  - item delete with No → item still present.
-- **Commands (from `implementer/src`):** `.venv/bin/python -m pytest tests -v` and `.venv/bin/python -m pytest tests/test_gui_delete.py tests/test_gui_delete_icon.py tests/test_gui_trash_icon.py -v`.
-- **Note:** pre-commit hook is installed; VERSION auto-bumps in every commit — expected, do not fight it.
+None.
 
 ## Queue
 
@@ -51,6 +39,7 @@ None.
 
 ## Recently Completed
 
+- Task 20 — Yes/No confirmation popups (messagebox.askyesno) gate both delete-list and delete-item GUI handlers; No = full no-op; verified, merged (8d07a84).
 - Task 19 — versioning: `bump_version.sh` + pre-commit hook auto-increments `todo_md/VERSION` (patch); headless `get_version()`; bottom-right GUI version badge; verified, merged (4fd69737, at VERSION 0.1.3).
 
 ## Queue
