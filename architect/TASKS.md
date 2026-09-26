@@ -27,11 +27,13 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 **Task 23 (S)** — Make placeholder focus tests deterministic (corrective follow-up to task 22)
 - Branch: `implementer/task-23-deterministic-focus-tests` (base and integration branch: `main`)
-- Background: task 22 merged (7a7d599), but post-merge the full suite shows 2 failures in `tests/test_gui_placeholders.py` (`test_focus_in_clears_placeholder`, `test_focus_out_on_empty_entry_restores_placeholder`): they rely on `focus_set()` generating real WM FocusIn events, which do not fire when the test window is not the active application. The production placeholder behavior is correct; the tests are unreliable.
-- Scope: `implementer/src/tests/test_gui_placeholders.py` (fix focus simulation); also harden any real-focus reliance in `implementer/src/tests/test_gui_new_list.py` with the same technique. No production-code changes unless a test proves a real bug (if so, report it instead of patching around it).
+- Status: first Implementer run TIMED OUT at 1200s with no commit. Checkpoint: uncommitted working-tree edits already converting `tests/test_gui_placeholders.py` and `tests/test_gui_new_list.py` from real focus (`focus_set`/`focus_force`) to `entry.event_generate("<FocusIn>")`/`"<FocusOut>"` (see latest uncommitted diff); looks complete but unverified.
+- Remaining scope: verify the uncommitted test edits, run the required tests (full suite twice), commit to the branch, hand off.
+- Blocker: child timeout (likely slow/hung test run or handoff stall); no production bug identified.
+- Revised approach: new Implementer continues on the same branch from the uncommitted state — review the existing edits (do not rewrite from scratch), fix only what fails, commit, hand off. If a test exposes a genuine production bug, stop and report instead of patching around it.
 - Acceptance criteria:
-  1. Focus in/out is simulated deterministically via `entry.event_generate("<FocusIn>")` / `entry.event_generate("<FocusOut>")` (with `app.root.update()` after), not via `focus_set`/`focus_force`.
-  2. All six placeholder tests pass; `test_gui_new_list.py` passes.
+  1. Focus in/out simulated via `event_generate` (plus `root.update()`); no reliance on the WM delivering real FocusIn/FocusOut (a `focus_force` solely to route a synthetic `<Return>` is acceptable in `test_gui_new_list.py`).
+  2. All placeholder tests and `test_gui_new_list.py` pass; assertions preserved.
   3. Full suite passes twice in a row consecutively.
 - Commands (from `implementer/src`):
   - `.venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v`
@@ -41,29 +43,28 @@ Prompt for the Implementer:
 ```
 You are the Implementer. Base/integration branch: `main`. Your assigned implementation branch is `implementer/task-23-deterministic-focus-tests` (already checked out).
 
-Task 23 (S): make the placeholder focus tests deterministic (corrective follow-up to task 22).
+Task 23 (S, follow-up after a timed-out run): finish making the placeholder focus tests deterministic.
 
-Background: task 22 (input placeholders) was merged, but post-merge the full suite fails 2 tests in implementer/src/tests/test_gui_placeholders.py: test_focus_in_clears_placeholder and test_focus_out_on_empty_entry_restores_placeholder. They call focus_set() and rely on the window manager emitting real FocusIn/FocusOut events; those events do not fire when the test window is not the active application, so the assertions see the placeholder still present. The production behavior in todo_md/app.py is believed correct — this is test unreliability, not a product bug.
+Context: a previous run on this branch TIMED OUT without committing. The working tree contains its uncommitted edits: implementer/src/tests/test_gui_placeholders.py and implementer/src/tests/test_gui_new_list.py have already been converted from real focus (focus_set/focus_force) to entry.event_generate("<FocusIn>")/entry.event_generate("<FocusOut>") + app.root.update(). That conversion addresses the post-merge failures of task 22's placeholder tests (they previously relied on the window manager emitting real FocusIn events, which do not fire when the test window is not the active app).
 
-Before editing: verify the current branch is `implementer/task-23-deterministic-focus-tests` and `git status --short` is clean; if not, stop and report.
+Before editing: verify the current branch is `implementer/task-23-deterministic-focus-tests`; run `git status --short` — the two test files above should show as modified (uncommitted). If the tree does not match, stop and report.
 
 Scope — you may modify ONLY:
 - implementer/src/tests/test_gui_placeholders.py
-- implementer/src/tests/test_gui_new_list.py (only to remove real-focus reliance, same technique)
-No production-code changes. If a test exposes a genuine production bug, do NOT work around it: stop and report it.
+- implementer/src/tests/test_gui_new_list.py
+No production-code changes. Do NOT rewrite the existing uncommitted conversion from scratch; review it and fix only what is wrong or failing.
 Do not change anything outside implementer/src/. Changes anywhere under architect/ or at the repository root are forbidden.
 
-Requirements:
-1. In test_gui_placeholders.py, simulate focus deterministically: entry.event_generate("<FocusIn>") / entry.event_generate("<FocusOut>") followed by app.root.update(), instead of focus_set()/focus_force(). Keep every existing assertion intact.
-2. In test_gui_new_list.py, replace focus_force()-based focus reliance with the same event_generate technique where it matters (the list-creation flow itself still uses event_generate("<Return>")).
-3. Keep the tests fast and self-contained (destroy root in finally).
+Work order:
+1. Review the uncommitted diff (`git diff -- implementer/src/tests/`): confirm every assertion from the previous version is preserved and the focus simulation is deterministic.
+2. Run from implementer/src: `.venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v`
+3. Fix failures minimally (tests only), re-run until green.
+4. Run `.venv/bin/python -m pytest tests -q` twice back-to-back; both runs must pass.
+5. Commit the two test files to `implementer/task-23-deterministic-focus-tests` (message summarizing the deterministic-focus fix).
 
-Run from implementer/src:
-- .venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v
-- .venv/bin/python -m pytest tests -q
-- run the full suite a second time back-to-back to confirm stability
+If a test exposes a genuine production bug, do NOT work around it: stop and report it.
 
-Commit your work to `implementer/task-23-deterministic-focus-tests`. Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to `main`, broad staging or destructive working-tree operations.
+Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to `main`, broad staging (e.g. `git add -A`) or destructive working-tree operations (do not discard the existing uncommitted edits).
 
 Handoff must end with: RESULT: SUCCESS or RESULT: FAILURE; BRANCH: implementer/task-23-deterministic-focus-tests; COMMIT: <full commit hash>; one-line test summary (include both full-suite runs); blockers if any.
 ```
