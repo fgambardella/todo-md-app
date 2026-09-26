@@ -1,7 +1,10 @@
 """GUI test: pressing Enter in the new-list entry creates the list.
 
-The entry starts showing its muted placeholder (task 22); focusing it
-removes the placeholder so the field starts clean before typing.
+The entry starts showing its muted placeholder (task 22); a simulated
+FocusIn event removes the placeholder deterministically (no reliance on
+the window manager delivering real focus). Note: Tk routes synthetic key
+events to the app's focus window, so the entry still needs focus_force()
+before the generated <Return> reaches its binding.
 """
 
 import tkinter.ttk  # noqa: F401  (ensure ttk available)
@@ -18,11 +21,16 @@ def test_return_creates_list(tmp_path):
     try:
         app.root.update()
 
-        app.new_name_entry.focus_force()
+        app.new_name_entry.event_generate("<FocusIn>")
         app.root.update()
         # Focus cleared the placeholder; enter the new list name.
         app.new_name_entry.delete(0, "end")
         app.new_name_entry.insert(0, "enter-list")
+        # Give the entry keyboard focus so the synthetic <Return> below is
+        # dispatched to its binding (focus_force is the only deterministic
+        # way to activate the test app in this environment).
+        app.new_name_entry.focus_force()
+        app.root.update()
         app.new_name_entry.event_generate("<Return>")
         app.root.update()
 
@@ -49,10 +57,14 @@ def test_return_with_empty_entry_creates_nothing(tmp_path):
 
         # Unfocused empty entry shows its muted placeholder hint.
         assert app.new_name_entry.get() == "Insert the name of a new list here"
-        app.new_name_entry.focus_force()
+        app.new_name_entry.event_generate("<FocusIn>")
         app.root.update()
         # Focus removed the placeholder: the field is now truly empty.
         assert app.new_name_entry.get() == ""
+        # Focus the entry so the generated <Return> actually reaches the
+        # handler (the no-op path must be exercised, not skipped).
+        app.new_name_entry.focus_force()
+        app.root.update()
         app.new_name_entry.event_generate("<Return>")
         app.root.update()
 

@@ -2,9 +2,9 @@
 
 Covered:
 - both entries show their placeholder on build (unfocused, empty);
-- focusing an entry clears the placeholder;
-- typed text survives focus-out (no placeholder residue);
-- focus-out on an empty entry restores the placeholder;
+- simulating FocusIn clears the placeholder;
+- typed text survives FocusOut (no placeholder residue);
+- FocusOut on an empty entry restores the placeholder;
 - after a theme toggle the displayed placeholder uses the new theme's
   muted gray (winfo_rgb probe: differs from entry background and main text);
 - Return in a placeholder-showing new-list entry is a no-op (no list created).
@@ -37,10 +37,12 @@ def test_focus_in_clears_placeholder(tmp_path):
     app = _build(tmp_path)
     try:
         app.root.update()
-        app.new_name_entry.focus_set()
+        # Deterministic: simulate the FocusIn event directly instead of
+        # relying on the window manager to deliver a real focus change.
+        app.new_name_entry.event_generate("<FocusIn>")
         app.root.update()
         assert app.new_name_entry.get() == ""
-        app.new_item_entry.focus_set()
+        app.new_item_entry.event_generate("<FocusIn>")
         app.root.update()
         assert app.new_item_entry.get() == ""
     finally:
@@ -52,11 +54,12 @@ def test_typed_text_survives_focus_out(tmp_path):
     try:
         app.root.update()
         entry = app.new_item_entry
-        entry.focus_set()
+        entry.event_generate("<FocusIn>")
         app.root.update()
         entry.delete(0, "end")
         entry.insert(0, "buy milk")
-        app.new_name_entry.focus_set()
+        app.new_name_entry.event_generate("<FocusIn>")
+        entry.event_generate("<FocusOut>")
         app.root.update()
         assert entry.get() == "buy milk"
     finally:
@@ -68,10 +71,11 @@ def test_focus_out_on_empty_entry_restores_placeholder(tmp_path):
     try:
         app.root.update()
         entry = app.new_name_entry
-        entry.focus_set()
+        entry.event_generate("<FocusIn>")
         app.root.update()
         assert entry.get() == ""  # placeholder removed on focus
-        app.new_item_entry.focus_set()
+        entry.event_generate("<FocusOut>")
+        app.new_item_entry.event_generate("<FocusIn>")
         app.root.update()
         assert entry.get() == NAME_PLACEHOLDER
     finally:
