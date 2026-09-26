@@ -24,11 +24,22 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None.
+- **ID/Title:** Task 20 — Confirmation popups for destructive actions.
+- **Branch:** `implementer/20-delete-confirmations` (base `main`; integrate back into `main`).
+- **Scope:** In `TodoApp` (src/todo_md/app.py) only, guard both destructive actions with a modal confirmation popup before executing: (1) deleting a list (the existing delete-list path in the sidebar), (2) deleting a todo item (the existing per-row trash-icon handler). Use `tkinter.messagebox.askyesno` (or `yesno`) with a clear message naming the target, e.g. list: "Delete list '<name>' and all of its items?" / item: "Delete item '<text>'?"; title like "Confirm deletion". Only proceed with the controller mutation when the user answers Yes; on No do nothing. Do NOT change controller/storage/domain behavior — the guard lives in the GUI handlers.
+- **Acceptance criteria:**
+  1. Neither delete action performs its mutation without a Yes answer (mock/patch `messagebox.askyesno` to return False → no controller call, no UI change, no file change).
+  2. On Yes, behavior is identical to before (mutation + refresh).
+  3. Message text names the list name / item text being deleted.
+  4. Full suite green, including existing delete tests (update existing GUI delete tests if they click through without the dialog — patch `askyesno` to return True where a real delete is intended).
+- **Required tests:** update `tests/test_gui_delete.py`, `tests/test_gui_delete_icon.py`, `tests/test_gui_trash_icon.py` (and any other affected) to patch the confirmation; add assertions that No → nothing happens (new test case, e.g. in `tests/test_gui_delete.py` or a new `tests/test_gui_confirm.py`):
+  - list delete with No → list still on disk + still in sidebar;
+  - item delete with No → item still present.
+- **Commands (from `implementer/src`):** `.venv/bin/python -m pytest tests -v` and `.venv/bin/python -m pytest tests/test_gui_delete.py tests/test_gui_delete_icon.py tests/test_gui_trash_icon.py -v`.
+- **Note:** pre-commit hook is installed; VERSION auto-bumps in every commit — expected, do not fight it.
 
 ## Queue
 
-- Now the delete list and delete todo item actions proceed without asking any confirmation to the user: it is dangerous and I want you implement a popup confirmation window (message + yes/no buttons) for both use cases.
 - Add placeholders in all input fields, explaining what that field is supposed to contain: like 'Insert the name of a new list here' or 'Add a new todo item here'. Important: those placeholders must disappear as soon as the user put the focus on it.
 - Now the application is shown with a standard icon in the MacOS dock, but I want it uses the following image: 'implementer/src/todo_md/assets/dock_icon.jpg'
 - Implement a build script in bash/zsh that builds the application in a self contained executable file for MacOS (Apple Silicon/arm64). Update 'README.md' file with precise instructions on how to use that script.
