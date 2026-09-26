@@ -1,6 +1,7 @@
 """GUI test: the per-item delete control is a transparent trash-icon label."""
 
 import os
+from unittest.mock import patch
 
 import tkinter as tk
 
@@ -35,9 +36,13 @@ def test_delete_control_is_trash_icon_label(tmp_path):
             assert str(delete_ctrl.cget("image"))  # non-empty image (photo)
             assert str(delete_ctrl.cget("text")) == ""
 
-        # Delete by clicking the icon label (invokes the bound handler)
-        app._item_rows[0][3].event_generate("<Button-1>")
+        # Delete by clicking the icon label (invokes the bound handler);
+        # the confirmation dialog is answered Yes.
+        with patch("tkinter.messagebox.askyesno", return_value=True) as ask:
+            app._item_rows[0][3].event_generate("<Button-1>")
         app.root.update()
+
+        ask.assert_called_once_with("Confirm deletion", 'Delete item "Alpha"?')
 
         assert len(app._item_rows) == 1
         assert app._item_rows[0][2].cget("text") == "Beta"

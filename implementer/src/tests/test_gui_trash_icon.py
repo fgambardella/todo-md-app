@@ -1,6 +1,7 @@
 """GUI test: trash icon size, source transparency, and widget transparency."""
 
 import os
+from unittest.mock import patch
 
 import tkinter as tk
 
@@ -40,8 +41,12 @@ def test_trash_icon_size_transparency_and_click(tmp_path):
             assert not isinstance(del_ctrl, tk.Button)
 
         # (d) CLICK: bound Button-1 handler removes the item and persists
-        app._item_rows[0][3].event_generate("<Button-1>")
+        # (confirmation answered Yes)
+        with patch("tkinter.messagebox.askyesno", return_value=True) as ask:
+            app._item_rows[0][3].event_generate("<Button-1>")
         app.root.update()
+
+        ask.assert_called_once_with("Confirm deletion", 'Delete item "Alpha"?')
 
         assert len(app._item_rows) == 1
         content = (tmp_path / "Trash.md").read_text()

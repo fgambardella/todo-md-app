@@ -360,6 +360,12 @@ class TodoApp:
         name = self._selected_name()
         if name is None:
             return
+        from tkinter import messagebox  # lazy: keep module importable headless
+
+        if not messagebox.askyesno(
+            "Confirm deletion", f'Delete list "{name}" and all of its items?'
+        ):
+            return
         self.controller.delete_list(name)
         self.refresh_lists(select_first=True)
 
@@ -458,6 +464,11 @@ class TodoApp:
 
     def _on_delete_item(self, index: int) -> None:
         if self.current_list is None:
+            return
+        from tkinter import messagebox  # lazy: keep module importable headless
+
+        text = self.controller.open_list(self.current_list).items[index].text
+        if not messagebox.askyesno("Confirm deletion", f'Delete item "{text}"?'):
             return
         self.controller.remove_item(self.current_list, index)
         self._refresh_items()
