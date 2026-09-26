@@ -24,11 +24,57 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None.
+**Task 21 (S)** — Fix version badge colors in light mode
+- Branch: `implementer/task-21-version-badge-colors` (base and integration branch: `main`)
+- Scope: `implementer/src/todo_md/app.py` (version label creation in `_build_ui`, palette handling in `_apply_theme`); `implementer/src/tests/test_gui_version.py` (extend, or add `tests/test_gui_version_colors.py`).
+- Acceptance criteria:
+  1. Version label background equals the main window background in both themes on the clam fallback path (effective colors equal via `winfo_rgb`).
+  2. Version text is a visible muted gray in both themes (light: clearly darker than bg, not black; dark: clearly lighter than bg, not white), still unobtrusive.
+  3. Colors stay correct after a theme toggle (`_apply_theme` refreshes label bg and fg).
+  4. Native `tk appappearance` path behavior unchanged (label background may stay unset there).
+- Required tests: label bg == root bg in light and dark; fg gray intermediate (not pure white/black); colors refreshed after toggle; existing `test_gui_version.py` tests still pass.
+- Commands (from `implementer/src`):
+  - `.venv/bin/python -m pytest tests/test_gui_version.py -v`
+  - `.venv/bin/python -m pytest tests -v`
+
+Prompt for the Implementer:
+```
+You are the Implementer. Base/integration branch: `main`. Your assigned implementation branch is `implementer/task-21-version-badge-colors` (already checked out).
+
+Task 21 (S): fix the version badge colors.
+
+Bug: in light mode the version display component (bottom-right version `tk.Label` in `TodoApp`, `implementer/src/todo_md/app.py`) has a dark background instead of matching the main window. In the clam fallback path the label is created without an explicit background and stays pinned to the system default color.
+
+Before editing: verify the current branch is `implementer/task-21-version-badge-colors` and `git status --short` is clean; if not, stop and report.
+
+Scope — you may modify ONLY these files:
+- `implementer/src/todo_md/app.py`
+- `implementer/src/tests/test_gui_version.py` (or add `implementer/src/tests/test_gui_version_colors.py`)
+Do not change anything outside `implementer/src/`. Changes anywhere under `architect/` or at the repository root are forbidden.
+
+Requirements:
+1. Set the version label background explicitly so it equals the main window background (`self.root` bg) in both light and dark mode on the fallback (clam) path; use the palette `bg`.
+2. Version text: a visible muted gray in both themes — light: clearly darker than the background but not black; dark: clearly lighter than the background but not white. Keep it unobtrusive (small font, low contrast vs background).
+3. Refresh the label background AND foreground in `_apply_theme` so a theme toggle keeps the colors correct.
+4. Do not change behavior on the native `tk appappearance` path (early return, `self._palette = None`); an unset label background is acceptable there.
+
+Tests to add/update (GUI tests on a real display: destroy `root` in `finally`, call `root.update()` after building, probe effective colors via `winfo_rgb`):
+- label effective background equals root effective background in light and in dark mode;
+- label foreground is a gray intermediate between background and main text (not pure white/black in either theme);
+- after toggling the theme, label background/foreground match the new theme values;
+- all pre-existing `test_gui_version.py` tests still pass.
+
+Run from `implementer/src`:
+- `.venv/bin/python -m pytest tests/test_gui_version.py -v`
+- `.venv/bin/python -m pytest tests -v`
+
+Commit your work to `implementer/task-21-version-badge-colors`. Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to `main`, broad staging or destructive working-tree operations.
+
+Handoff must end with: RESULT: SUCCESS or RESULT: FAILURE; BRANCH: implementer/task-21-version-badge-colors; COMMIT: <full commit hash>; one-line test summary; blockers if any.
+```
 
 ## Queue
 
-- Resolve a GUI bug from task 19: in light mode the background color of the version display component is dark. Fix it by making it the same color of the main window's backgroud and make the text color of the version a visible gray color, but quite toned down so as not to distract.
 - Add placeholders in all input fields, explaining what that field is supposed to contain: like 'Insert the name of a new list here' or 'Add a new todo item here'. Important: those placeholders must disappear as soon as the user put the focus on it.
 - Now the application is shown with a standard icon in the MacOS dock, but I want it uses the following image: 'implementer/src/todo_md/assets/dock_icon.jpg'
 - Implement a build script in bash/zsh that builds the application in a self contained executable file for MacOS (Apple Silicon/arm64). Update 'README.md' file with precise instructions on how to use that script.
