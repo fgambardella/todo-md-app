@@ -129,6 +129,9 @@ class TodoApp:
         self.current_list: str | None = None
         self._item_rows: list[tuple] = []
         self._palette: dict | None = None
+        # entry widget -> its placeholder text (empty fields show this muted
+        # hint; a displayed placeholder counts as "empty" for submission).
+        self._placeholders: dict = {}
 
         self.root = tk.Tk()
         self.root.title("TODO Markdown App")
@@ -190,6 +193,9 @@ class TodoApp:
         self.new_name_entry = ttk.Entry(left, width=20)
         self.new_name_entry.pack(fill=tk.X)
         self.new_name_entry.bind("<Return>", lambda _e: self._on_create_list())
+        self._attach_placeholder(
+            self.new_name_entry, "Insert the name of a new list here"
+        )
 
         btn_row = ttk.Frame(left)
         btn_row.pack(fill=tk.X, pady=(6, 0))
@@ -220,6 +226,7 @@ class TodoApp:
         self.new_item_entry = ttk.Entry(add_row)
         self.new_item_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.new_item_entry.bind("<Return>", lambda _e: self._on_add_item())
+        self._attach_placeholder(self.new_item_entry, "Add a new todo item here")
         ttk.Button(add_row, text="Add", command=self._on_add_item).pack(
             side=tk.LEFT, padx=(6, 0)
         )
@@ -267,6 +274,9 @@ class TodoApp:
             "list_bg": list_bg,
             # Low-contrast badge color: legible but unobtrusive on bg.
             "version_fg": "#555555" if theme == "dark" else "#9a9a9a",
+            # Muted placeholder gray: legible on entry_bg yet clearly more
+            # subdued than the real text color (fg) in either theme.
+            "placeholder_fg": "#8a8a8a" if theme == "dark" else "#999999",
         }
 
         style = ttk.Style(self.root)
@@ -309,6 +319,52 @@ class TodoApp:
         version_label = getattr(self, "version_label", None)
         if version_label is not None:
             version_label.config(bg=bg, foreground=self._palette["version_fg"])
+        # Keep a *displayed* placeholder in sync with the new theme's muted
+        # gray; entries holding real text keep the style foreground.
+        for entry, text in self._placeholders.items():
+            if entry.winfo_exists() and entry.get() == text:
+                entry.configure(foreground=self._palette["placeholder_fg"])
+
+    # -- entry placeholders ----------------------------------------------
+
+    def _attach_placeholder(self, entry, text: str) -> None:
+        """Show ``text`` as a muted placeholder on ``entry``.
+
+        The hint is removed the instant the entry gains focus (only when it
+        is still the displayed content) and restored when focus leaves an
+        empty entry. A displayed placeholder is treated as empty by the
+        submit handlers, so it can never be created as a list/item.
+        """
+        self._placeholders[entry] = text
+        entry.insert(0, text)
+        entry.configure(foreground=self._placeholder_fg())
+        entry.bind("<FocusIn>", lambda _e, e=entry: self._on_entry_focus_in(e))
+        entry.bind("<FocusOut>", lambda _e, e=entry: self._on_entry_focus_out(e))
+
+    def _placeholder_fg(self) -> str:
+        """Muted gray for placeholder text in the current (fallback) theme."""
+        return (self._palette or {}).get("placeholder_fg", "#808080")
+
+    def _entry_value(self, entry) -> str:
+        """Strip the entry's text; a displayed placeholder counts as empty."""
+        if entry.get() == self._placeholders.get(entry, ""):
+            return ""
+        return entry.get().strip()
+
+    def _on_entry_focus_in(self, entry) -> None:
+        if entry.get() == self._placeholders.get(entry, ""):
+            entry.delete(0, "end")
+            entry.configure(foreground=(self._palette or {}).get("fg", "#000000"))
+
+    def _on_entry_focus_out(self, entry) -> None:
+        if entry.get().strip() == "":
+            self._restore_placeholder(entry)
+
+    def _restore_placeholder(self, entry) -> None:
+        """Re-show the placeholder on an empty, unfocused entry."""
+        entry.delete(0, "end")
+        entry.insert(0, self._placeholders[entry])
+        entry.configure(foreground=self._placeholder_fg())
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"
@@ -352,7 +408,7 @@ class TodoApp:
         self._refresh_items()
 
     def _on_create_list(self) -> None:
-        name = self.new_name_entry.get().strip()
+        name = self._entry_value(self.new_name_entry)
         if not name:
             return
         try:
@@ -360,6 +416,7 @@ class TodoApp:
         except FileExistsError:
             return
         self.new_name_entry.delete(0, "end")
+        self._restore_placeholder(self.new_name_entry)
         self.refresh_lists(select_first=False)
         self._select_list_name(name)
 
@@ -483,11 +540,12 @@ class TodoApp:
     def _on_add_item(self) -> None:
         if self.current_list is None:
             return
-        text = self.new_item_entry.get().strip()
+        text = self._entry_value(self.new_item_entry)
         if not text:
             return
         self.controller.add_item(self.current_list, text)
         self.new_item_entry.delete(0, "end")
+        self._restore_placeholder(self.new_item_entry)
         self._refresh_items()
 
     # -- lifecycle ----------------------------------------------------------
