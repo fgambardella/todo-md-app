@@ -160,14 +160,21 @@ class TodoApp:
         # --- version badge: bottom-right, unobtrusive --------------------
         # Packed first (side=bottom) so the left/right frames fill only the
         # remaining space and the existing layout is undisturbed.
-        # Unset background inherits the root background and flips with it.
+        # Fallback (clam) path: pin the background to the palette bg, since an
+        # unset tk bg stays on the system color and does not flip. Native path
+        # (self._palette is None): leave the background unset so it inherits
+        # the root and flips with `tk appappearance`.
         version_fg = (self._palette or {}).get("version_fg", "#808080")
+        version_kwargs = (
+            {"background": self._palette["bg"]} if self._palette is not None else {}
+        )
         self.version_label = tk.Label(
             self.root,
             text=f"v{get_version()}",
             font=("", 8),
             foreground=version_fg,
             padx=8,
+            **version_kwargs,
         )
         self.version_label.pack(side=tk.BOTTOM, anchor="e")
 
@@ -301,7 +308,7 @@ class TodoApp:
             listbox.config(bg=list_bg, fg=fg, highlightbackground=btn_bg)
         version_label = getattr(self, "version_label", None)
         if version_label is not None:
-            version_label.config(foreground=self._palette["version_fg"])
+            version_label.config(bg=bg, foreground=self._palette["version_fg"])
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"
