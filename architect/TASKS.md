@@ -28,10 +28,11 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None — Task 26 completed and merged this cycle; the next queued item is intentionally not promoted (wrap-up on user request).
+None
 
 ## Queue
 
+- The self-contained launchable `dist/todo-md.app` application file, built by`scripts/build_app.sh` (PyInstaller, arm64), shows a default icon in finder. Use instead `implementer/src/todo_md/assets/dock_icon.png` as the application file icon.
 - Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it.
 
 ## Active Blockers
