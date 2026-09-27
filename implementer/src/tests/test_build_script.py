@@ -37,6 +37,21 @@ def test_script_contains_arm64_host_guard():
     assert "arm64" in content, "script must guard on arm64 (Apple Silicon)"
 
 
+def test_script_builds_icns_from_dock_icon_and_passes_icon_flag():
+    content = SCRIPT.read_text(encoding="utf-8")
+    assert "dock_icon.png" in content, (
+        "script must reference the dock_icon.png source asset"
+    )
+    assert "sips" in content, "script must resize the icon via macOS sips"
+    assert "iconutil" in content, (
+        "script must generate the .icns via iconutil (.icns generation step)"
+    )
+    assert ".icns" in content, "script must produce a .icns file"
+    assert "--icon" in content, (
+        "script must pass the .icns to PyInstaller via --icon"
+    )
+
+
 @pytest.mark.skipif(
     os.environ.get("RUN_BUILD_TESTS") != "1",
     reason="full build integration test only runs with RUN_BUILD_TESTS=1",

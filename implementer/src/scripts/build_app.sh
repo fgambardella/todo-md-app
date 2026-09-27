@@ -14,11 +14,15 @@
 #   2. Ensures PyInstaller is installed in the project venv (implementer/src/.venv);
 #      PyInstaller is a dev-only build dependency (see requirements-dev.txt),
 #      the todo_md package itself keeps stdlib-only imports.
-#   3. Runs PyInstaller with --onedir --windowed --name todo-md, placing
-#      workpath/specpath under implementer/src/build/ and the bundle at
+#   3. Builds a valid .icns app icon from todo_md/assets/dock_icon.png using
+#      macOS sips + iconutil (standard 16/32/128/256/512 @1x and @2x set),
+#      placing the .icns under implementer/src/build/.
+#   4. Runs PyInstaller with --onedir --windowed --name todo-md, passing the
+#      .icns via --icon, and placing workpath/specpath under
+#      implementer/src/build/ and the bundle at
 #      implementer/src/dist/todo-md.app. Package data (assets, VERSION) is
 #      collected via --collect-data so the frozen app finds them.
-#   4. Smoke check: launches dist/todo-md.app/Contents/MacOS/todo-md, waits
+#   5. Smoke check: launches dist/todo-md.app/Contents/MacOS/todo-md, waits
 #      ~3s, asserts the process is still alive and its stderr contains no
 #      traceback, then terminates it. Exits non-zero on any failure.
 #
@@ -51,14 +55,52 @@ if ! "$VENV_PY" -c "import PyInstaller" >/dev/null 2>&1; then
   "$VENV_PY" -m pip install pyinstaller
 fi
 
+# --- App icon: build a valid .icns from dock_icon.png ---------------------------------
+ICON_SRC="$SRC_DIR/todo_md/assets/dock_icon.png"
+ICNS_PATH="$BUILD_DIR/todo_md.icns"
+if [ ! -f "$ICON_SRC" ]; then
+  echo "ERROR: source app icon not found: $ICON_SRC" >&2
+  exit 1
+fi
+if ! command -v sips >/dev/null 2>&1 || ! command -v iconutil >/dev/null 2>&1; then
+  echo "ERROR: 'sips' and 'iconutil' (macOS built-in) are required to build the .icns." >&2
+  exit 1
+fi
+echo "Building .icns from $ICON_SRC ..."
+mkdir -p "$BUILD_DIR"
+ICONSET="$BUILD_DIR/todo_md.iconset"
+rm -rf "$ICONSET"
+mkdir -p "$ICONSET"
+# Standard iconset sizes (16/32/128/256/512 @1x and @2x). The source PNG is
+# 450x450, so sizes larger than that (512, 1024) are upscaled by sips —
+# acceptable for the app icon. sips -z takes HEIGHT WIDTH.
+mksized() { sips -z "$1" "$2" "$ICON_SRC" --out "$3" >/dev/null; }
+mksized 16 16   "$ICONSET/icon_16x16.png"
+mksized 32 32   "$ICONSET/icon_16x16@2x.png"
+mksized 32 32   "$ICONSET/icon_32x32.png"
+mksized 64 64   "$ICONSET/icon_32x32@2x.png"
+mksized 128 128 "$ICONSET/icon_128x128.png"
+mksized 256 256 "$ICONSET/icon_128x128@2x.png"
+mksized 256 256 "$ICONSET/icon_256x256.png"
+mksized 512 512 "$ICONSET/icon_256x256@2x.png"
+mksized 512 512 "$ICONSET/icon_512x512.png"
+mksized 1024 1024 "$ICONSET/icon_512x512@2x.png"
+iconutil -c icns "$ICONSET" -o "$ICNS_PATH"
+rm -rf "$ICONSET"
+if [ ! -f "$ICNS_PATH" ]; then
+  echo "ERROR: .icns generation failed: $ICNS_PATH" >&2
+  exit 1
+fi
+
 # --- Build the bundle ----------------------------------------------------------------
-echo "Building todo-md.app with PyInstaller (--onedir --windowed)..."
+echo "Building todo-md.app with PyInstaller (--onedir --windowed, icon: $ICNS_PATH)..."
 # Run from SRC_DIR so the todo_md package is importable for module analysis.
 (
   cd "$SRC_DIR"
   "$VENV_PY" -m PyInstaller \
     --noconfirm --clean \
     --onedir --windowed --name todo-md \
+    --icon "$ICNS_PATH" \
     --workpath "$BUILD_DIR/work" \
     --specpath "$BUILD_DIR" \
     --distpath "$DIST_DIR" \
