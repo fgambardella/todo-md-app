@@ -156,10 +156,10 @@ class TodoApp:
         self.theme = load_theme(self.config_dir)
         self._apply_theme(self.theme)
 
-        # Cached trash-bin icon (~18px after subsampling the 512x512 source).
+        # Cached trash-bin icon (pre-sized 18x18 asset; source 512x512 kept in assets/).
         self._trash_image = tk.PhotoImage(
-            file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "trash.png")
-        ).subsample(28)
+            file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "trash_18.png")
+        )
 
         self._build_ui()
         # Re-apply after the UI exists: the fallback palette must set

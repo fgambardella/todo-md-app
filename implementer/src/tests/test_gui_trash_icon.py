@@ -27,7 +27,7 @@ def test_trash_icon_size_transparency_and_click(tmp_path):
         assert 14 <= app._trash_image.height() <= 22
 
         # (b) SOURCE TRANSPARENCY: PNG IHDR color type byte (offset 25) is 6 or 4
-        icon_path = os.path.join("todo_md", "assets", "trash.png")
+        icon_path = os.path.join("todo_md", "assets", "trash_18.png")
         with open(icon_path, "rb") as fh:
             data = fh.read()
         assert data[:4] == b"\x89PNG"

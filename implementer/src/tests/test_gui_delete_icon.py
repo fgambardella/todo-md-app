@@ -17,7 +17,7 @@ def test_delete_control_is_trash_icon_label(tmp_path):
     controller.add_item("Del", "Beta")
 
     # Provisioned royalty-free icon exists and is a real PNG
-    icon_path = os.path.join("todo_md", "assets", "trash.png")
+    icon_path = os.path.join("todo_md", "assets", "trash_18.png")
     assert os.path.isfile(icon_path)
     with open(icon_path, "rb") as fh:
         assert fh.read(4) == b"\x89PNG"
