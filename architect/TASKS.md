@@ -27,52 +27,40 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 ## Active Task
 
 **Task 25 (S)** — Placeholder bug: hint re-enters a still-focused input after submit
-- Branch: `implementer/task-25-placeholder-focus` (base and integration branch: `main`; not yet created)
-- Scope: `implementer/src/todo_md/app.py` (placeholder focus logic); `implementer/src/tests/test_gui_placeholders.py` (new regression tests; minimal alignment of other placeholder-related GUI tests if needed).
-- Bug report: after creating a todo item or a new list by typing the name and pressing Enter, the typed text in the input field is replaced by the placeholder text, which then does not disappear when the user starts typing again — because the focus never actually left the field, the focus-in clear never re-fires.
-- Technical notes: the focus-out placeholder-restore path must verify the entry actually lost focus (e.g. `root.focus_get() is not entry`) before writing the placeholder; submit must leave the entry cleared. Follow the Task 23 deterministic-focus convention (`event_generate("<FocusIn>")`/`"<FocusOut>")` plus `focus_set()` where a real focus state is asserted).
+- Branch: `implementer/task-25-placeholder-focus` (base and integration branch: `main`; checked out)
+- Checkpoint: `COMMIT: NONE` — first attempt timed out. The core fix exists as uncommitted working-tree changes: focus guard in `_restore_placeholder` (`implementer/src/todo_md/app.py`: early return when `root.focus_get() is entry`) + 4 new regression tests in `implementer/src/tests/test_gui_placeholders.py` (10/10 pass). Never discard or rewrite these uncommitted changes.
+- Current blocker: `tests/test_gui_new_list.py::test_return_creates_list` fails — it asserts the pre-fix buggy contract (placeholder text present in the still-focused entry after submit).
+- Remaining scope:
+  1. Align only the post-submit assertion in `test_gui_new_list.py::test_return_creates_list` with the fixed behavior (still-focused entry cleared and placeholder-free, `== ""`); keep its on-disk/listbox/`current_list` assertions.
+  2. Full suite green.
+  3. Commit `app.py` + both test files on the branch.
 - Acceptance criteria:
-  1. After typing a name and pressing Enter (or clicking the button) to create an item/list, the entry is cleared and contains no placeholder text; further typing in the still-focused field works normally.
-  2. The placeholder hint is still restored on a genuine focus-out (focus moved to another widget) when the field content is empty.
-  3. Focus-in still clears a visible placeholder (existing behavior unchanged).
-  4. No changes beyond the placeholder focus handling (themes, layout, handlers untouched).
-- Required tests: with the entry focused and a submit performed, the field holds no placeholder text; a simulated real focus-out on an empty entry restores the placeholder; existing placeholder/new-list tests keep passing.
+  1. Submit with focus on the field leaves the entry cleared, no placeholder text; further typing works normally.
+  2. Genuine focus-out on an empty entry restores the placeholder; focus-in clears a visible placeholder.
+  3. No changes beyond placeholder focus handling.
 - Commands (from `implementer/src`):
-  - `.venv/bin/python -m pytest tests/test_gui_placeholders.py -v`
+  - `.venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v`
   - `.venv/bin/python -m pytest tests -v`
 
 Prompt for the Implementer:
 ```
-You are the Implementer. Base/integration branch: `main`. Your assigned implementation branch is `implementer/task-25-placeholder-focus` (already checked out).
+You are the Implementer. Base/integration branch: `main`. Your assigned implementation branch is `implementer/task-25-placeholder-focus` (already checked out). This is a follow-up after a timeout; the previous attempt left the core fix uncommitted in the working tree.
 
-Task 25 (S): fix the placeholder bug where the hint re-enters a still-focused input after submit.
-
-Bug: after creating a todo item or a new list by typing the name and pressing Enter, the typed text in the input field is replaced by the placeholder hint text, which then does not disappear when the user starts typing again. Cause: the focus-out placeholder-restore path runs even though the focus never actually left the entry, so the placeholder is written into a field that still has focus (the focus-in clear never re-fires).
-
-Before editing: verify the current branch is `implementer/task-25-placeholder-focus` and `git status --short` is clean; if not, stop and report.
-
-Scope — you may modify/create ONLY:
+Before editing: verify the branch is `implementer/task-25-placeholder-focus` and `git status --short` shows exactly these two modified files:
 - implementer/src/todo_md/app.py
-- implementer/src/tests/test_gui_placeholders.py (regression tests; extend or add as needed)
-- minimal alignment of other placeholder-related GUI tests ONLY if their asserted contract conflicts with the fix
-Do not change anything outside implementer/src/. Changes anywhere under architect/ or at the repository root are forbidden.
+- implementer/src/tests/test_gui_placeholders.py
+If anything else is modified or these are missing, stop and report. Do NOT discard, revert, or rewrite the existing uncommitted changes.
 
-Requirements:
-1. The placeholder-restore path must only write the placeholder when the entry has genuinely lost focus (e.g. check `self.root.focus_get() is not entry`); a submit while the field still has focus must leave the entry cleared and placeholder-free.
-2. Genuine focus-out (focus moved to another widget) on an empty entry must still restore the muted-gray placeholder hint.
-3. Focus-in must still clear a visible placeholder (existing behavior unchanged).
-4. No other behavior changes (themes, layout, handlers untouched).
+Task 25 (S, follow-up): finish the fix for the placeholder bug where the hint re-enters a still-focused input after submit.
 
-Tests (tests/test_gui_placeholders.py; GUI tests on a real display: destroy root in finally, call root.update() after building; use the deterministic-focus convention from the existing placeholder tests — `event_generate("<FocusIn>")`/`"<FocusOut>")` for events, `focus_set()` when a real focus state must be asserted):
-- entry focused + submit performed (Enter in the entry): the field is cleared and does NOT contain the placeholder text, while still focused;
-- focus genuinely moved away then `<FocusOut>` on an empty entry: the placeholder text is restored;
-- focus-in on a field showing the placeholder clears it (regression guard).
+Already in place (do not redo): `_restore_placeholder` in todo_md/app.py returns early when `self.root.focus_get() is entry`; 4 new regression tests in tests/test_gui_placeholders.py (10/10 pass).
 
-Run from implementer/src:
-- .venv/bin/python -m pytest tests/test_gui_placeholders.py -v
-- .venv/bin/python -m pytest tests -v
+Remaining work:
+1. tests/test_gui_new_list.py::test_return_creates_list currently asserts the old buggy contract: after Enter it expects `app.new_name_entry.get() == "Insert the name of a new list here"`. Update ONLY that post-submit assertion (and its comment) to the fixed behavior: while the entry still has focus it must be cleared and placeholder-free (`== ""`). Leave the rest of the test (on-disk file, listbox selection, current_list) untouched.
+2. Verify from implementer/src: `.venv/bin/python -m pytest tests/test_gui_placeholders.py tests/test_gui_new_list.py -v`, then `.venv/bin/python -m pytest tests -v` — all green.
+3. Stage exactly the three files (todo_md/app.py, tests/test_gui_placeholders.py, tests/test_gui_new_list.py) and commit them to `implementer/task-25-placeholder-focus` with a clear message.
 
-Commit your work to `implementer/task-25-placeholder-focus`. Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to main, broad staging or destructive working-tree operations.
+Scope — you may modify ONLY the three files above. Do not change anything outside implementer/src/. Changes anywhere under architect/ or at the repository root are forbidden. Forbid: creating/switching/merging/rebasing/renaming/deleting branches, pushing, committing to main, destructive working-tree operations.
 
 Handoff must end with: RESULT: SUCCESS or RESULT: FAILURE; BRANCH: implementer/task-25-placeholder-focus; COMMIT: <full commit hash>; one-line test summary; blockers if any.
 ```
@@ -93,4 +81,3 @@ None.
 - Task 22 — input placeholders: muted-gray hints on both entries (placeholder_fg), cleared on focus-in, restored on empty focus-out, counted as empty on submit; new `test_gui_placeholders.py` + minimal `test_gui_new_list.py` contract alignment; merged (3c26e92).
 - Task 21 — version badge colors: fallback-path label bg pinned to window palette bg, muted-gray fg in both themes, bg+fg refreshed on toggle; new `test_gui_version_colors.py`; verified, merged (4c03028).
 - Task 20 — Yes/No confirmation popups (messagebox.askyesno) gate both delete-list and delete-item GUI handlers; No = full no-op; verified, merged (8d07a84).
-- Task 19 — versioning: `bump_version.sh` + pre-commit hook auto-increments `todo_md/VERSION` (patch); headless `get_version()`; bottom-right GUI version badge; verified, merged (4fd69737, at VERSION 0.1.3).
