@@ -1,0 +1,6 @@
+# Dev-only build dependencies (NOT runtime dependencies of todo_md,
+# which stays stdlib-only).
+#
+# Used by scripts/build_app.sh to produce the macOS app bundle:
+#   .venv/bin/python -m pip install -r requirements-dev.txt
+pyinstaller==6.22.3

@@ -28,7 +28,7 @@ implementer/src/
 └── tests/              # pytest suite (GUI tests run on a real display here)
 ```
 
-Repo-level: `implementer/scripts/bump_version.sh` (+ `--install-hook`) maintains `.git/hooks/pre-commit`, which bumps the PATCH of `VERSION` and stages it into every commit; the hook is git-internal and must be (re)installed per clone.
+Repo-level: `implementer/src/scripts/bump_version.sh` (+ `--install-hook`) maintains `.git/hooks/pre-commit`, which bumps the PATCH of `VERSION` and stages it into every commit; the hook is git-internal and must be (re)installed per clone. `implementer/src/scripts/build_app.sh` builds a self-contained `dist/todo-md.app` with PyInstaller (`--onedir --windowed`, `--collect-data todo_md`, arm64 host guard, post-build launch smoke check); PyInstaller is dev-only, pinned in `implementer/src/requirements-dev.txt`.
 
 - **Domain** — `todo_md/models.py`: `TodoItem(text, done, created)`, `TodoList(name, items)` with validated add/toggle/remove/rename.
 - **Persistence** — `todo_md/storage.py`: `MarkdownListStore(data_dir)`; atomic writes (temp file + `os.replace`); names sanitized to `[A-Za-z0-9_-]`; `lists()` picks up `.md` files only.
