@@ -38,9 +38,10 @@ def test_return_creates_list(tmp_path):
         assert (tmp_path / "enter-list.md").exists()
         # List appears in the listbox
         assert "enter-list" in list(app.listbox.get(0, "end"))
-        # Entry is cleared: the muted placeholder is restored on the empty
-        # field and is never submitted as content.
-        assert app.new_name_entry.get() == "Insert the name of a new list here"
+        # Entry is cleared and stays placeholder-free: it still holds
+        # focus after submit, so _restore_placeholder must leave it
+        # empty instead of re-inserting the hint.
+        assert app.new_name_entry.get() == ""
         # Newly created list is selected
         assert app.current_list == "enter-list"
     finally:
