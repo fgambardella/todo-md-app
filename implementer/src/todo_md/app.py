@@ -33,8 +33,11 @@ class TodoController:
     load -> mutate -> persist via ``store.save``.
     """
 
-    def __init__(self, store: MarkdownListStore) -> None:
+    def __init__(
+        self, store: MarkdownListStore, data_dir: str | None = None
+    ) -> None:
         self.store = store
+        self.data_dir = data_dir if data_dir is not None else store.data_dir
 
     # -- list-level operations -------------------------------------------
 
@@ -125,7 +128,7 @@ class TodoApp:
         import tkinter as tk  # lazy: keep module importable headless
 
         self.controller = controller
-        self.data_dir = data_dir if data_dir is not None else self.controller.store.data_dir
+        self.data_dir = data_dir if data_dir is not None else self.controller.data_dir
         # Theme settings live in a dedicated config dir alongside (not inside)
         # the lists dir; default: <lists-parent>/config.
         self.config_dir = (

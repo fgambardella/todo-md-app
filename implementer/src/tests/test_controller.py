@@ -72,3 +72,17 @@ def test_empty_text_add_item_raises(controller):
         controller.add_item("work", "")
     with pytest.raises(ValueError):
         controller.add_item("work", "   ")
+
+
+def test_data_dir_defaults_to_store_data_dir(tmp_path):
+    store = MarkdownListStore(tmp_path / "data")
+    controller = TodoController(store)
+    assert controller.data_dir == store.data_dir
+
+
+def test_data_dir_explicit_override_wins(tmp_path):
+    store = MarkdownListStore(tmp_path / "data")
+    override = str(tmp_path / "override")
+    controller = TodoController(store, data_dir=override)
+    assert controller.data_dir == override
+    assert controller.data_dir != store.data_dir
