@@ -25,6 +25,9 @@ src/
 │   ├── version.py      # Headless version loader (get_version)
 │   ├── app.py          # TodoController (UI-agnostic view-model) + TodoApp (tkinter GUI)
 │   └── __main__.py     # Entry point: python -m todo_md
+├── scripts/
+│   ├── build_app.sh    # PyInstaller build → self-contained dist/todo-md.app (Apple Silicon only)
+│   └── bump_version.sh # version bump + pre-commit hook installer
 └── tests/              # pytest suite (headless core + GUI tests on a real display)
 ```
 
@@ -34,6 +37,7 @@ src/
 - **Versioning — `version.py` + `VERSION`**: headless `get_version()` reads `todo_md/VERSION` (falls back to `0.0.0`); the GUI displays it as a small low-contrast badge in the bottom-right corner. A git pre-commit hook (installed via `implementer/src/scripts/bump_version.sh --install-hook`) bumps the patch version on every commit.
 - **Presentation — `app.py` (`TodoApp`)**: a native-feeling **Tkinter** GUI (list sidebar with create/delete — button or Enter in the new-list entry, checkbutton-backed item rows, an entry + button for adding items, refresh after each mutation). Deleting a list or an item first asks for confirmation (Yes/No popup). Tkinter is imported lazily so the package stays importable on display-less machines/CI.
 - **Entry point — `__main__.py`**: launches controller + GUI via `run()`.
+- **Build tooling — `scripts/build_app.sh`**: freezes the app into a self-contained `todo-md.app` bundle for Apple Silicon macOS (see “Building a self-contained app bundle” below).
 
 Data flow: **GUI → Controller → (Models) → MarkdownListStore → `.md` files**, with the store re-read after each mutation to drive the UI refresh.
 
@@ -77,3 +81,19 @@ From the `src/` directory, using the venv:
 ```
 
 This opens the Tkinter window. Your lists are created and edited in `~/.todo-md-app/lists/` as plain Markdown files, which you can also edit by hand and see reflected on the next refresh.
+
+## Building a self-contained app bundle (macOS, Apple Silicon)
+
+On an Apple Silicon Mac, the build script freezes the app into a self-contained `todo-md.app` bundle using PyInstaller (a dev-only build dependency — the app itself stays stdlib-only):
+
+```bash
+cd implementer/src
+bash scripts/build_app.sh
+```
+
+- Also works from the repo root: `bash implementer/src/scripts/build_app.sh` (all paths resolve relative to the script).
+- Aborts with a clear error on non-arm64 hosts.
+- If PyInstaller is missing it is installed into `.venv` automatically (pinned in `implementer/src/requirements-dev.txt`).
+- Output: `implementer/src/dist/todo-md.app` — open it in Finder or run `dist/todo-md.app/Contents/MacOS/todo-md`. `build/` and `dist/` are local artifacts and are never committed.
+- The script ends with a smoke check: the bundle must launch, stay alive ~3s without any traceback in stderr, then it is terminated.
+- The full build is also covered by a gated integration test (skipped by default to keep the suite fast): from `implementer/src`, `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v`.
