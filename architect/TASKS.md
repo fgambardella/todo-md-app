@@ -28,30 +28,11 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-- **Task 30 (S)** — Pre-sized trash icon (removes debt item 1: 28× runtime subsample of the 512×512 source).
-- **Branch:** `implementer/task-30-trash-icon-presize` (base: `main`).
-- **Scope:** new binary asset `implementer/src/todo_md/assets/trash_18.png`; `implementer/src/todo_md/app.py`; `implementer/src/tests/test_gui_trash_icon.py`; `implementer/src/tests/test_gui_delete_icon.py`.
-- **Acceptance criteria:**
-  1. `todo_md/assets/trash_18.png` committed: exactly 18×18, transparent PNG (IHDR color type 4 or 6), generated with `sips -z 18 18` from the 512×512 `trash.png` (source asset retained).
-  2. `TodoApp` loads `trash_18.png` directly; no `.subsample` call remains in `todo_md/app.py`; the displayed icon is still 18px.
-  3. Both GUI tests updated to reference `trash_18.png` (size range and transparency assertions kept).
-  4. Full suite green.
-- **Required tests:** update the two GUI tests above; run full suite.
-- **Commands (from `implementer/src`):** `sips -z 18 18 todo_md/assets/trash.png --out todo_md/assets/trash_18.png`; `.venv/bin/python -m pytest tests/test_gui_trash_icon.py tests/test_gui_delete_icon.py -v`; `.venv/bin/python -m pytest tests -v`; verify asset: `.venv/bin/python -c "from PIL import Image"` is NOT required — check IHDR via `xxd`/Python stdlib (bytes 16–24).
-- **Prompt for Implementer:**
-  You are the Implementer for todo-md-app. Work in the implementer/ workspace (this directory).
-  1. Verify you are on branch 'implementer/task-30-trash-icon-presize' and the working tree is clean (git status --short); do not proceed otherwise.
-  2. From src/: generate the pre-sized asset with 'sips -z 18 18 todo_md/assets/trash.png --out todo_md/assets/trash_18.png' (downscale keeps the alpha channel). Verify the output PNG header: width/height in bytes 16–24 must be 18×18 and IHDR color type (byte 25) must be 4 or 6. Keep the original 512×512 trash.png as the source asset; do not delete it.
-  3. In src/todo_md/app.py: make TodoApp load assets/trash_18.png directly (no .subsample call); update the nearby comment. No other behavioral changes.
-  4. Update src/tests/test_gui_trash_icon.py and src/tests/test_gui_delete_icon.py to reference trash_18.png (keep the 14–22px size range and transparency assertions; the displayed width/height of the PhotoImage must remain exactly 18).
-  5. Run from src/: '.venv/bin/python -m pytest tests/test_gui_trash_icon.py tests/test_gui_delete_icon.py -v' then the full suite '.venv/bin/python -m pytest tests -v'.
-  6. Commit all changes (including the new binary asset) on implementer/task-30-trash-icon-presize (NEVER on main).
-  7. Handoff: report RESULT: SUCCESS|FAILURE, COMMIT: <hash>, branch name, test results, blockers.
-  Constraints: only touch src/todo_md/app.py, src/todo_md/assets/trash_18.png (new file), src/tests/test_gui_trash_icon.py, src/tests/test_gui_delete_icon.py; do not modify AGENTS.md, ../architect/, or the repo root; do not create/switch/merge/push/rebase branches; no destructive git operations; commit only staged paths.
+None
 
 ## Queue
 
-(empty — remaining debt plan fully queued as executed; next items come from future user requests)
+None (debt plan fully executed; next items come from future user requests).
 
 ## Active Blockers
 
@@ -59,8 +40,9 @@ None.
 
 ## Recently Completed
 
+- Task 30 — pre-sized trash icon: 18×18 RGBA `assets/trash_18.png` (sips from the 512×512 source, which is kept); GUI loads it directly, `.subsample(28)` gone; 2 GUI tests updated; verified 86/1-skip (d2f6964).
 - Task 29 — explicit `TodoController.data_dir` (optional override, defaults to store's); `TodoApp` derives from the controller, no more store reach-in; 2 new headless tests; verified 86/1-skip (790ee86).
-- Task 28 — debt triage and reduction plan (Architect): 4 debt items analysed; items 2/3 accepted as constraints with rationale in `decisions/2026-09-27-debt-triage.md`; items 1/4 turned into queued tasks 29/30 (S each).
+- Task 28 — debt triage and reduction plan (Architect): 4 debt items analysed; 2 accepted as constraints with rationale in `decisions/2026-09-27-debt-triage.md`; 2 executed as tasks 29/30.
 - Task 27 — app bundle Finder icon: `build_app.sh` generates `build/todo_md.icns` from `dock_icon.png` via sips/iconutil and passes `--icon` to PyInstaller; static test extended; verified 84/1-skip + real bundle with valid `.icns`/`CFBundleIconFile` (4c09751).
 - Task 26 — arm64 build script: `scripts/build_app.sh` (PyInstaller `--onedir --windowed` + `--collect-data`, arm64 guard, post-build launch smoke check) + pinned dev dep + gated build tests + README usage docs; verified (83 passed/1 skipped, real bundle built and launched from repo root), merged (011e048; README c9f0829).
 - Task 25 — placeholder re-entry bug: `_restore_placeholder` no-ops while the entry still holds focus; old buggy `test_gui_new_list.py` contract aligned; 4 new regression tests; after one child timeout, finished from uncommitted checkpoint; verified 80/80, merged (d511d85).
