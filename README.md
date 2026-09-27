@@ -95,5 +95,6 @@ bash scripts/build_app.sh
 - Aborts with a clear error on non-arm64 hosts.
 - If PyInstaller is missing it is installed into `.venv` automatically (pinned in `implementer/src/requirements-dev.txt`).
 - Output: `implementer/src/dist/todo-md.app` — open it in Finder or run `dist/todo-md.app/Contents/MacOS/todo-md`. `build/` and `dist/` are local artifacts and are never committed.
+- The bundle shows a custom Finder icon: the script generates a `.icns` from `todo_md/assets/dock_icon.png` via macOS `sips`/`iconutil` at build time.
 - The script ends with a smoke check: the bundle must launch, stay alive ~3s without any traceback in stderr, then it is terminated.
 - The full build is also covered by a gated integration test (skipped by default to keep the suite fast): from `implementer/src`, `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v`.
