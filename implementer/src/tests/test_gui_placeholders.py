@@ -120,3 +120,93 @@ def test_return_on_empty_new_list_entry_creates_nothing(tmp_path):
         assert app.new_name_entry.get() == NAME_PLACEHOLDER
     finally:
         app.root.destroy()
+
+
+def test_submit_keeps_focused_name_entry_cleared(tmp_path):
+    """Task 25: creating a list while the entry still holds focus must not
+    write the placeholder hint into the still-focused field."""
+    app = _build(tmp_path)
+    try:
+        app.root.update()
+        entry = app.new_name_entry
+        entry.focus_force()  # real focus state: the entry genuinely has focus
+        app.root.update()
+        entry.event_generate("<FocusIn>")
+        app.root.update()
+        entry.insert(0, "Work")
+        # Enter in the entry (its <Return> binding), focus never leaving it.
+        app._on_create_list()
+        app.root.update()
+        assert app.controller.list_names() == ["Work"]
+        # Field is cleared, placeholder-free, and focus never left it.
+        assert entry.get() == ""
+        assert app.root.focus_get() is entry
+    finally:
+        app.root.destroy()
+
+
+def test_submit_keeps_focused_item_entry_cleared(tmp_path):
+    """Task 25: same guard for the new-item entry."""
+    app = _build(tmp_path)
+    try:
+        app.root.update()
+        app.controller.create_list("Work")
+        app.refresh_lists(select_first=True)
+        app.root.update()
+        entry = app.new_item_entry
+        entry.focus_force()  # real focus state: the entry genuinely has focus
+        app.root.update()
+        entry.event_generate("<FocusIn>")
+        app.root.update()
+        entry.insert(0, "buy milk")
+        # Enter in the entry (its <Return> binding), focus never leaving it.
+        app._on_add_item()
+        app.root.update()
+        items = app.controller.open_list("Work").items
+        assert [i.text for i in items] == ["buy milk"]
+        # Field is cleared, placeholder-free, and focus never left it.
+        assert entry.get() == ""
+        assert app.root.focus_get() is entry
+    finally:
+        app.root.destroy()
+
+
+def test_genuine_focus_out_restores_placeholder_on_empty_entry(tmp_path):
+    """Task 25: when focus truly moves to another widget, an empty entry
+    must still get its muted placeholder hint restored."""
+    app = _build(tmp_path)
+    try:
+        app.root.update()
+        entry = app.new_name_entry
+        entry.focus_force()
+        app.root.update()
+        entry.event_generate("<FocusIn>")
+        app.root.update()
+        assert entry.get() == ""  # placeholder removed on focus
+        # Genuine focus move: another widget now holds the focus.
+        app.new_item_entry.focus_force()
+        app.root.update()
+        entry.event_generate("<FocusOut>")
+        app.root.update()
+        assert entry.get() == NAME_PLACEHOLDER
+        assert app.root.focus_get() is app.new_item_entry
+    finally:
+        app.root.destroy()
+
+
+def test_focus_in_clears_visible_placeholder_regression_guard(tmp_path):
+    """Task 25: focus-in must still clear a displayed placeholder, even after
+    the submit path has been exercised (guarding against the clear being
+    skipped when the field is already focused)."""
+    app = _build(tmp_path)
+    try:
+        app.root.update()
+        entry = app.new_name_entry
+        assert entry.get() == NAME_PLACEHOLDER
+        entry.focus_force()
+        app.root.update()
+        entry.event_generate("<FocusIn>")
+        app.root.update()
+        assert entry.get() == ""
+    finally:
+        app.root.destroy()

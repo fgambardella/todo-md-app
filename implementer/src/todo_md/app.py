@@ -398,7 +398,14 @@ class TodoApp:
             self._restore_placeholder(entry)
 
     def _restore_placeholder(self, entry) -> None:
-        """Re-show the placeholder on an empty, unfocused entry."""
+        """Re-show the placeholder on an empty entry that no longer has focus.
+
+        While the entry still holds the focus (e.g. right after a submit
+        that cleared it), writing the hint would leave stale placeholder
+        text in a focused field, since no FocusIn will re-fire to clear it.
+        """
+        if self.root.focus_get() is entry:
+            return
         entry.delete(0, "end")
         entry.insert(0, self._placeholders[entry])
         entry.configure(foreground=self._placeholder_fg())
