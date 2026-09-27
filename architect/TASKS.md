@@ -28,12 +28,35 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None
+- **Task 27 (S)** — App bundle Finder icon: `dist/todo-md.app` currently shows the default PyInstaller icon in Finder; it must display the app icon from `implementer/src/todo_md/assets/dock_icon.png`.
+- **Branch:** `implementer/task-27-app-bundle-icon` (base: `main`).
+- **Scope:** only `implementer/src/scripts/build_app.sh` and `implementer/src/tests/test_build_script.py`.
+- **Approach:** in `build_app.sh`, before invoking PyInstaller, generate a `.icns` from `todo_md/assets/dock_icon.png` using standard macOS tools (`sips` + `iconutil`) into the untracked `build/` dir, and pass it via `--icon` to PyInstaller. No new runtime/dev dependencies; `.icns` is a build artifact, never committed. Update the script header comment accordingly.
+- **Acceptance criteria:**
+  1. `bash scripts/build_app.sh` from repo root succeeds (existing smoke check unchanged and passing).
+  2. The built bundle contains the icon resource (`dist/todo-md.app/Contents/Resources/` holds a `.icns`) and `Contents/Info.plist` references it (`CFBundleIconFile`).
+  3. `test_build_script.py` static assertions extended to require the script to reference `dock_icon.png`, `.icns` generation, and `--icon`.
+  4. Full suite still green.
+- **Required tests:** update `tests/test_build_script.py` (static assertions; the gated real build covers end-to-end); run full suite.
+- **Commands (from `implementer/src`):**
+  - `.venv/bin/python -m pytest tests/test_build_script.py -v`
+  - `.venv/bin/python -m pytest tests -v`
+  - `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v` (real build, verifies bundle icon artifact)
+  - `bash scripts/build_app.sh` and inspect `dist/todo-md.app/Contents/Resources/` + `plutil -p dist/todo-md.app/Contents/Info.plist | grep -i icon`
+- **Prompt for Implementer:**
+  You are the Implementer for todo-md-app. Work in `implementer/` (repo root is `../`).
+  1. Verify you are on branch `implementer/task-27-app-bundle-icon` and that the working tree is clean (`git status --short`); do not proceed otherwise.
+  2. Modify `implementer/src/scripts/build_app.sh`: before the PyInstaller invocation, use macOS `sips` + `iconutil` to build a valid `.icns` from `implementer/src/todo_md/assets/dock_icon.png` (an app-icon set with the standard sizes, e.g. 16/32/128/256/512 @1x and @2x; the PNG is 450×450 so `sips` may upscale larger sizes — that is acceptable, or cap the set at sizes ≤ 450). Place the `.icns` under the existing untracked `build/` dir and pass it to PyInstaller via `--icon`. Keep the arm64 guard, venv guard, PyInstaller guard, existing PyInstaller flags, and the launch smoke check exactly as they are. Update the script's header comment to mention the icon. Do not commit `build/` or `dist/` (already gitignored).
+  3. Extend `implementer/src/tests/test_build_script.py` static assertions to require the script to reference `dock_icon.png`, the `.icns` generation step, and the `--icon` flag.
+  4. Run from `implementer/src`: `.venv/bin/python -m pytest tests/test_build_script.py -v` (default skip path), then the real build: `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v`, then the full suite `.venv/bin/python -m pytest tests -v`.
+  5. Verify the built bundle: `plutil -p dist/todo-md.app/Contents/Info.plist | grep -i icon` must show `CFBundleIconFile`, and `ls dist/todo-md.app/Contents/Resources/` must contain the `.icns`.
+  6. Commit all changes on `implementer/task-27-app-bundle-icon` (never on `main`).
+  7. Handoff: report `RESULT: SUCCESS|FAILURE`, `COMMIT: <hash>`, branch name, test results, and any blockers.
+  Constraints: only touch `implementer/src/scripts/build_app.sh` and `implementer/src/tests/test_build_script.py`; do not modify anything under `implementer/AGENTS.md`, `architect/`, or repo root; do not create/switch/merge/push branches; no destructive git operations; commit staged paths only.
 
 ## Queue
 
-- The self-contained launchable `dist/todo-md.app` application file, built by`scripts/build_app.sh` (PyInstaller, arm64), shows a default icon in finder. Use instead `implementer/src/todo_md/assets/dock_icon.png` as the application file icon.
-- Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it.
+- Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it (Architect-owned analysis; no implementation).
 
 ## Active Blockers
 
