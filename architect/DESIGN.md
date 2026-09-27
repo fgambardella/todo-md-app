@@ -55,7 +55,7 @@ Repo-level: `implementer/src/scripts/bump_version.sh` (+ `--install-hook`) maint
 
 ## Known Architectural Debt
 
-1. `TodoApp` reaches into `controller.store.data_dir` to derive data/config locations — implicit controller→store coupling; an explicit data_dir parameter on the controller would be cleaner.
-2. The native `tk appappearance` path is dead on this machine (Tcl 9.0.4 rejects it); theming depends on Tcl build behavior and the clam fallback.
-3. Plain `tk` widgets pin their default `-bg` to `systemWindowBackgroundColor` resolved once — any theming work must keep explicit per-widget palette backgrounds (current constraint, handled via `self._palette`).
-4. `trash.png` is 512×512 and subsampled 28× at runtime; a pre-sized ~18px asset would be cleaner.
+1. `TodoApp` reaches into `controller.store.data_dir` to derive data/config locations — implicit controller→store coupling; an explicit data_dir on the controller would be cleaner.
+2. `trash.png` is 512×512 and subsampled 28× at runtime; a pre-sized ~18px asset would be cleaner.
+
+Accepted constraints (not debt): the native `tk appappearance` probe is kept despite being dead on this machine (guarded, harmless), and plain-tk default `-bg` pinning is mitigated via `self._palette` — rationale in `decisions/2026-09-27-debt-triage.md`.

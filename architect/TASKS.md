@@ -28,11 +28,29 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None
+- **Task 29 (S)** — Explicit `data_dir` on `TodoController` (removes debt item 1: GUI reaching into the store).
+- **Branch:** `implementer/task-29-controller-data-dir` (base: `main`).
+- **Scope:** `implementer/src/todo_md/app.py` and `implementer/src/tests/test_controller.py`.
+- **Acceptance criteria:**
+  1. `TodoController.__init__` accepts an optional `data_dir` (defaults to the store's `data_dir`) and exposes it as a public attribute.
+  2. `TodoApp` derives its data dir from `self.controller.data_dir`; no `store.data_dir` access remains anywhere in `todo_md/app.py`.
+  3. New headless tests in `tests/test_controller.py`: default `data_dir` equals the store's; an explicit `data_dir` override wins.
+  4. Full suite green; no behavior change to existing controller/GUI tests.
+- **Required tests:** extend `tests/test_controller.py`; run full suite.
+- **Commands (from `implementer/src`):** `.venv/bin/python -m pytest tests/test_controller.py -v` then `.venv/bin/python -m pytest tests -v`
+- **Prompt for Implementer:**
+  You are the Implementer for todo-md-app. Work in the implementer/ workspace (this directory).
+  1. Verify you are on branch 'implementer/task-29-controller-data-dir' and the working tree is clean (git status --short); do not proceed otherwise.
+  2. In src/todo_md/app.py: give TodoController an optional `data_dir` constructor parameter (defaulting to the store's data_dir) exposed as a public attribute; change TodoApp so it derives its data dir from `self.controller.data_dir` instead of `self.controller.store.data_dir`. No other behavioral changes.
+  3. In src/tests/test_controller.py: add headless tests asserting the default data_dir equals the store's and that an explicit override wins.
+  4. Run from src/: '.venv/bin/python -m pytest tests/test_controller.py -v' then the full suite '.venv/bin/python -m pytest tests -v'.
+  5. Commit all changes on implementer/task-29-controller-data-dir (NEVER on main).
+  6. Handoff: report RESULT: SUCCESS|FAILURE, COMMIT: <hash>, branch name, test results, blockers.
+  Constraints: only touch src/todo_md/app.py and src/tests/test_controller.py; do not modify AGENTS.md, ../architect/, or the repo root; do not create/switch/merge/push/rebase branches; no destructive git operations; commit only staged paths.
 
 ## Queue
 
-- Analyse the Known Architectural Debt in 'architect/DESIGN.md' and make a plan to reduce it (Architect-owned analysis; no implementation).
+- Task 30 (S) — Pre-sized trash icon: commit an 18×18 `todo_md/assets/trash_18.png` (sips from the 512×512 source, alpha kept); `TodoApp` loads it without `.subsample(28)` (debt item 2).
 
 ## Active Blockers
 
@@ -40,6 +58,7 @@ None.
 
 ## Recently Completed
 
+- Task 28 — debt triage and reduction plan (Architect): 4 debt items analysed; items 2/3 accepted as constraints with rationale in `decisions/2026-09-27-debt-triage.md`; items 1/4 turned into queued tasks 29/30 (S each).
 - Task 27 — app bundle Finder icon: `build_app.sh` generates `build/todo_md.icns` from `dock_icon.png` via sips/iconutil and passes `--icon` to PyInstaller; static test extended; verified 84/1-skip + real bundle with valid `.icns`/`CFBundleIconFile` (4c09751).
 - Task 26 — arm64 build script: `scripts/build_app.sh` (PyInstaller `--onedir --windowed` + `--collect-data`, arm64 guard, post-build launch smoke check) + pinned dev dep + gated build tests + README usage docs; verified (83 passed/1 skipped, real bundle built and launched from repo root), merged (011e048; README c9f0829).
 - Task 25 — placeholder re-entry bug: `_restore_placeholder` no-ops while the entry still holds focus; old buggy `test_gui_new_list.py` contract aligned; 4 new regression tests; after one child timeout, finished from uncommitted checkpoint; verified 80/80, merged (d511d85).
