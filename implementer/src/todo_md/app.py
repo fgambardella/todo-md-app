@@ -19,6 +19,13 @@ __all__ = ["TodoController", "TodoApp", "run"]
 DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), ".todo-md-app", "lists")
 
 
+def dock_icon_path() -> str:
+    """Package-relative path to the PNG dock icon asset."""
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "assets", "dock_icon.png"
+    )
+
+
 class TodoController:
     """Mediates between the user (or UI) and the MarkdownListStore.
 
@@ -137,6 +144,9 @@ class TodoApp:
         self.root.title("TODO Markdown App")
         self.root.geometry("700x420")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self._dock_icon = None
+        self._apply_dock_icon()
 
         # Theme: load (first start creates settings.json) and apply before
         # the UI is built so every widget starts in the right palette.
@@ -324,6 +334,33 @@ class TodoApp:
         for entry, text in self._placeholders.items():
             if entry.winfo_exists() and entry.get() == text:
                 entry.configure(foreground=self._palette["placeholder_fg"])
+
+    # -- dock icon --------------------------------------------------------
+
+    def _apply_dock_icon(self) -> None:
+        """Set the macOS dock icon from the bundled PNG asset (fail-soft).
+
+        ``PhotoImage`` cannot decode the source JPEG, so a PNG conversion
+        (``dock_icon.png``) is committed alongside it. The image is kept
+        alive on ``self._dock_icon`` — a tkinter image held only by the
+        interpreter would otherwise be garbage-collected. If the icon file
+        is missing or unreadable, the icon is skipped and the app runs
+        normally.
+        """
+        import tkinter as tk
+
+        try:
+            photo = tk.PhotoImage(file=dock_icon_path())
+        except tk.TclError:
+            self._dock_icon = None
+            return
+        self._dock_icon = photo
+        try:
+            self.root.iconphoto(True, photo)
+        except tk.TclError:
+            # iconphoto is unsupported on some platforms (e.g. X11); the
+            # image is still kept alive, but its absence must never crash.
+            pass
 
     # -- entry placeholders ----------------------------------------------
 
