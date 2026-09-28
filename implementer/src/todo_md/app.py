@@ -12,15 +12,49 @@ import os
 from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
 from .settings import (
+    Settings,
     load_settings,
     resolve_theme,
     save_settings,  # headless module (stdlib only)
 )
 from .version import get_version  # headless module (no tkinter)
 
-__all__ = ["TodoController", "TodoApp", "run"]
+__all__ = [
+    "TodoController",
+    "TodoApp",
+    "run",
+    "DEFAULT_CONFIG_DIR",
+    "DEFAULT_DATA_DIR",
+    "startup_dirs",
+]
 
-DEFAULT_DATA_DIR = os.path.join(os.path.expanduser("~"), ".todo-md-app", "lists")
+# App data root: the config dir is FIXED here (settings.json lives in
+# <root>/config/) and is never derived from, nor moved by, the lists dir.
+DEFAULT_APP_ROOT = os.path.join(os.path.expanduser("~"), ".todo-md-app")
+DEFAULT_CONFIG_DIR = os.path.join(DEFAULT_APP_ROOT, "config")
+DEFAULT_DATA_DIR = os.path.join(DEFAULT_APP_ROOT, "lists")
+
+
+def startup_dirs(config_dir: str | None = None) -> tuple[str, str, Settings]:
+    """Startup ordering: load settings first, then derive the data dir.
+
+    Returns ``(config_dir, data_dir, settings)`` where:
+
+    * ``config_dir`` is the fixed config dir (``~/.todo-md-app/config`` by
+      default, or an explicit override) — it is *never* inside the lists
+      dir and changing the lists dir never moves the settings file;
+    * ``data_dir`` is the effective lists dir: ``settings.lists_dir`` when
+      saved, else ``~/.todo-md-app/lists`` (created on demand).
+
+    Headless (no tkinter) so the startup flow is testable without a
+    display. Callers build the store/controller from the returned
+    ``data_dir``.
+    """
+    cfg = config_dir if config_dir is not None else DEFAULT_CONFIG_DIR
+    settings = load_settings(cfg)
+    data_dir = settings.lists_dir or DEFAULT_DATA_DIR
+    os.makedirs(data_dir, exist_ok=True)
+    return cfg, data_dir, settings
 
 
 def dock_icon_path() -> str:
@@ -133,12 +167,12 @@ class TodoApp:
 
         self.controller = controller
         self.data_dir = data_dir if data_dir is not None else self.controller.data_dir
-        # Theme settings live in a dedicated config dir alongside (not inside)
-        # the lists dir; default: <lists-parent>/config.
+        # Theme settings live in a dedicated config dir that is FIXED at
+        # ~/.todo-md-app/config (or an explicit override): it is never
+        # derived from the lists dir, so changing the lists path never
+        # moves the settings file.
         self.config_dir = (
-            config_dir
-            if config_dir is not None
-            else os.path.join(os.path.dirname(os.path.abspath(self.data_dir)), "config")
+            config_dir if config_dir is not None else DEFAULT_CONFIG_DIR
         )
         self.current_list: str | None = None
         self._item_rows: list[tuple] = []
@@ -612,9 +646,15 @@ class TodoApp:
         self.root.mainloop()
 
 
-def run() -> None:
-    """Build the controller + :class:`TodoApp` and start the main loop."""
-    store = MarkdownListStore(DEFAULT_DATA_DIR)
-    controller = TodoController(store)
-    app = TodoApp(controller)
+def run(config_dir: str | None = None) -> None:
+    """Build the controller + :class:`TodoApp` and start the main loop.
+
+    Startup order: load settings from the fixed config dir, derive the
+    effective lists data dir from ``settings.lists_dir`` (or the default,
+    created on demand), then build the store/controller with it.
+    """
+    cfg, data_dir, _settings = startup_dirs(config_dir)
+    store = MarkdownListStore(data_dir)
+    controller = TodoController(store, data_dir=data_dir)
+    app = TodoApp(controller, data_dir=data_dir, config_dir=cfg)
     app.mainloop()
