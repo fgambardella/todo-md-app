@@ -41,9 +41,9 @@ Repo-level: `implementer/src/scripts/bump_version.sh` (+ `--install-hook`) maint
 ## Data Models & Flow
 
 - `TodoItem(text: str, done: bool, created: float)`; `TodoList(name: str, items: list[TodoItem])`.
-- Disk: `<lists>/<Name>.md` = `# <Name>` header + `- [ ]`/`- [x]` lines; plus the settings JSON `{"theme": "light"|"dark"|"system", "lists_dir": str|null, "completed_visible": int}` at `<app-root>/config/settings.json` (config dir sits alongside, never inside, the lists dir; legacy single-key theme files load compatibly).
+- Disk: `<lists>/<Name>.md` = `# <Name>` header + `- [ ]`/`- [x]` lines; plus the settings JSON `{"theme": "light"|"dark"|"system", "lists_dir": str|null, "completed_visible": int}` at `<app-root>/config/settings.json` (config dir FIXED at `~/.todo-md-app/config`, never derived from the lists dir; legacy single-key theme files load compatibly).
 - Data flow: GUI → `TodoController` → `MarkdownListStore` → `.md` files; store re-read after each mutation drives UI refresh.
-- Theme flow: startup → `load_settings` → `resolve_theme` (`"system"` detected live, never persisted; no file is written on first start) → `_apply_theme` → build UI → idempotent re-apply after `_build_ui` so the palette reaches built widgets. Toggle → `save_settings` (full payload) → re-apply → `_refresh_items` (row bgs + adaptive label fgs re-resolve).
+- Startup flow: headless `startup_dirs` (fixed config dir → `load_settings` → data dir from `settings.lists_dir` or `~/.todo-md-app/lists`, created on demand) → build store/controller with that dir → `resolve_theme` (`"system"` detected live, never persisted; nothing written on first start) → `_apply_theme` → build UI → idempotent re-apply after `_build_ui`. Toggle → `save_settings` (full payload) → re-apply → `_refresh_items` (row bgs + adaptive label fgs re-resolve). `TodoApp`/`run` accept `config_dir` overrides for tests.
 
 ## External Interfaces
 
