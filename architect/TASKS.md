@@ -21,23 +21,14 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 - Both input fields (new list, new item) show muted-gray placeholder hints: cleared on focus-in, counted as empty on submit.
 - Readability: item label colors adapt to background luminance in both themes; entry fills follow the palette (slightly lighter than list background in dark mode).
 - Versioning: version lives in `todo_md/VERSION`, auto-incremented (patch) by a pre-commit hook; GUI shows it as a small low-contrast bottom-right badge that adapts on theme toggle.
-- Dock icon: macOS startup sets a custom dock icon from a bundled PNG (JPEG source kept); missing/unsupported icons fail soft.
-- Settings: headless `settings.json` core (theme light/dark/system — system detected live at startup, never persisted; lists_dir; completed-visible count) with legacy-compat load and atomic save; theme switcher flips the whole window including item rows; buttons use darker hover/press fills; stored in `~/.todo-md-app/config/`.
+- Dock icon: macOS sets a custom dock icon at startup from a bundled PNG (JPEG source kept); fails soft.
+- Settings: headless `settings.json` core (theme light/dark/system, detected live and never persisted; lists_dir; completed-visible count), legacy-compat load, atomic save; startup honors a saved lists dir; config dir fixed at `~/.todo-md-app/config/`; theme switcher flips the whole window; darker hover/press button fills.
 - Build: `scripts/build_app.sh` (PyInstaller, arm64) builds a self-contained launchable `dist/todo-md.app` with post-build smoke check and custom Finder icon (`.icns` generated at build time); PyInstaller is dev-only (runtime stays stdlib-only).
 - Release packaging: `scripts/release_package.sh` builds, validates strict `X.Y.Z`, and zips the bundle as `dist/todo-md-<version>-arm64.zip` (app at zip root, no `__MACOSX`); gated end-to-end test.
 
 ## Active Task
 
-- **Task 33 (S)** — Startup settings wiring + fixed config dir.
-  - Branch: `implementer/task-33-startup-settings` (base `main`).
-  - Prompt:
-    - You are the Implementer. Work ONLY on branch `implementer/task-33-startup-settings`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`. Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/push; no commit to `main`; no destructive working-tree operations.
-    - Read `architect/DESIGN.md` (Settings config, Data models sections) and `src/todo_md/app.py` (config_dir/data_dir wiring in `TodoApp.__init__` and `run()`), `src/todo_md/settings.py`, `src/tests/test_headless_smoke.py`, `src/tests/test_settings.py`.
-    - Changes: (1) config dir is FIXED at `~/.todo-md-app/config/` and must no longer be derived from the lists dir (changing the lists path must not move the settings file); support an injectable/overridable config root (optional parameter on `TodoApp`/`run` or a module-level helper with the default) so tests can point it at a temp dir; (2) on startup the app loads settings first, then derives the effective lists data dir (`settings.lists_dir` or default `~/.todo-md-app/lists/`, created on demand) and creates the store/controller with it; (3) keep the theme behavior exactly as-is (`resolve_theme` on loaded settings); (4) make the effective data dir observable (e.g. `self.data_dir` on the app) for later tasks — no sidebar-reload logic yet.
-    - Tests (headless): config dir fixed and independent of a saved `lists_dir`; effective data dir from a saved `lists_dir` (temp dirs); default data dir on a fresh run (use overrides — never write real user data in tests); existing GUI smoke/behavior tests stay green.
-    - Acceptance criteria: startup reads settings → derives data dir → builds store with it; config dir never inside the lists dir; theme behavior unchanged; full suite green.
-    - Commands (from `implementer/src`): `.venv/bin/python -m pytest tests -v` (no failures/errors; 2 gated integration tests may stay skipped).
-    - Commit finished work (and stabilized partial work) on the branch; hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
+None.
 
 ## Queue
 
@@ -55,8 +46,8 @@ None.
 
 ## Recently Completed
 
-- Task 32 — settings core: `todo_md/settings.py` (`Settings` dataclass, legacy-compat `load_settings`, validating atomic `save_settings`, `resolve_theme` with live never-persisted system detection); `theme.py` removed, GUI/tests migrated; verified 101 passed/2 skipped (b0c3be2).
+- Task 33 — startup settings wiring: fixed config dir `~/.todo-md-app/config` (never derived from the lists dir, overridable for tests), headless `startup_dirs` derives data dir from saved `lists_dir` (default created on demand), store/controller built with it; verified 106 passed/2 skipped (998778c).
+- Task 32 — settings core: `todo_md/settings.py` (`Settings` dataclass, legacy-compat `load_settings`, validating atomic `save_settings`, `resolve_theme` with live never-persisted system detection); `theme.py` removed, GUI/tests migrated; verified 101 passed/2 skipped (b0c3be2, merged adbedc4).
 - Task 31b — v0.2.1 release cut (Architect-direct per user): VERSION commit lands at `0.2.1` (ecd4eb7); package rebuilt on `main` → `dist/todo-md-0.2.1-arm64.zip` (sha256 2ba5021d…); tagged `v0.2.1`, pushed per explicit request; user attaches zip in GitHub web release UI.
 - Task 31a — one-command release packaging: `scripts/release_package.sh` (build → strict X.Y.Z validation → ditto zip, app at zip root) + static/gated tests; verified 90 passed/2 skipped + `RUN_RELEASE_TESTS=1` 5/5 (3be777e, merged c35805c).
 - Task 30 — pre-sized trash icon: 18×18 RGBA `assets/trash_18.png` (sips from the 512×512 source, which is kept); GUI loads it directly, `.subsample(28)` gone; 2 GUI tests updated; verified 86/1-skip (d2f6964).
-- Task 29 — explicit `TodoController.data_dir` (optional override, defaults to store's); `TodoApp` derives from the controller, no more store reach-in; 2 new headless tests; verified 86/1-skip (790ee86).
