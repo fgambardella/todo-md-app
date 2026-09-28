@@ -11,7 +11,11 @@ import os
 
 from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
-from .theme import load_theme, save_theme  # headless module (stdlib only)
+from .settings import (
+    load_settings,
+    resolve_theme,
+    save_settings,  # headless module (stdlib only)
+)
 from .version import get_version  # headless module (no tkinter)
 
 __all__ = ["TodoController", "TodoApp", "run"]
@@ -151,9 +155,11 @@ class TodoApp:
         self._dock_icon = None
         self._apply_dock_icon()
 
-        # Theme: load (first start creates settings.json) and apply before
-        # the UI is built so every widget starts in the right palette.
-        self.theme = load_theme(self.config_dir)
+        # Theme: load settings and resolve (system detection is never
+        # persisted) before the UI is built so every widget starts in the
+        # right palette.
+        self.settings = load_settings(self.config_dir)
+        self.theme = resolve_theme(self.settings)
         self._apply_theme(self.theme)
 
         # Cached trash-bin icon (pre-sized 18x18 asset; source 512x512 kept in assets/).
@@ -415,7 +421,8 @@ class TodoApp:
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"
-        save_theme(self.config_dir, new)
+        self.settings.theme = new
+        save_settings(self.config_dir, self.settings)
         self.theme = new
         self._apply_theme(new)
         self._theme_btn.config(text=self._theme_button_text())

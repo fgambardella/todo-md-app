@@ -21,7 +21,7 @@ src/
 │   ├── __init__.py     # package exports (MarkdownListStore)
 │   ├── models.py       # Domain layer: TodoItem, TodoList dataclasses
 │   ├── storage.py      # Persistence layer: MarkdownListStore
-│   ├── theme.py        # Headless theme settings (load/save, system-default detection)
+│   ├── settings.py     # Headless settings (Settings, load/save, theme resolution)
 │   ├── version.py      # Headless version loader (get_version)
 │   ├── app.py          # TodoController (UI-agnostic view-model) + TodoApp (tkinter GUI)
 │   └── __main__.py     # Entry point: python -m todo_md
@@ -70,7 +70,7 @@ cd src
 .venv/bin/python -m pytest tests -v
 ```
 
-Expected: 90 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_theme.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`.
+Expected: 101 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_settings.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`.
 
 ## Running the app
 
