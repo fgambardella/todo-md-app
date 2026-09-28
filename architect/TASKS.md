@@ -29,22 +29,16 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 ## Active Task
 
 - **Task 32 (S)** — Settings core module (macro: user settings page, overall size L, ordered queue 32→36).
-  - Branch: `implementer/task-32-settings-core` (base `main`).
-  - Scope: `implementer/src/todo_md/settings.py` (replaces `theme.py`), `implementer/src/todo_md/app.py`, `implementer/src/todo_md/__init__.py`, `implementer/src/tests/` only.
-  - Prompt:
-    - You are the Implementer. Work ONLY on branch `implementer/task-32-settings-core`; base and integration branch is `main`. First verify `git branch --show-current` and `git status --short` from `implementer/`. You may change only files under `implementer/`; never touch `architect/` or the repo root, never modify `implementer/src/AGENTS.md`, never create/switch/merge/push branches, never commit to `main`.
-    - Read `architect/DESIGN.md` (Theme config / Data models sections) and existing `src/todo_md/theme.py`, `tests/test_theme.py`.
-    - Create `src/todo_md/settings.py` replacing `theme.py`:
-      - `Settings` dataclass: `lists_dir: str | None` (None = default `~/.todo-md-app/lists/`), `theme: str` (one of `"light"`, `"dark"`, `"system"`), `completed_visible: int` (>= 0; how many completed items stay visible; 0 hides all completed; default 10).
-      - `load_settings(config_dir)`: reads `settings.json`; fully backward-compatible with the legacy `{"theme": "light"|"dark"}` file (missing keys → defaults); missing/corrupt file → all defaults; no exceptions on read.
-      - `save_settings(config_dir, settings)`: atomic write (temp + `os.replace`, same pattern as theme.py), UTF-8, keys `theme`, `lists_dir` (omit/null when default), `completed_visible`.
-      - `resolve_theme(settings)`: returns `"light"`/`"dark"`; for `"system"` uses the existing macOS `defaults read -g AppleInterfaceStyle` detection with graceful fallback to `"light"`. Do NOT persist the resolved system value.
-      - Keep the module headless (no tkinter).
-    - Delete `theme.py`; update all imports (`app.py`, `__init__.py`, tests); rename `tests/test_theme.py` → `tests/test_settings.py` preserving all existing theme-behavior coverage, and add tests for: all-defaults load, legacy JSON compatibility, round-trip save/load, `"system"` resolution (mock the detection), `completed_visible` negative/invalid rejected on save input, `lists_dir` passthrough.
-    - No GUI changes; existing theme switcher behavior must be unchanged.
-    - Acceptance criteria: `settings.py` exposes `Settings`/`load_settings`/`save_settings`/`resolve_theme`; `theme.py` gone with zero remaining references; full suite green.
-    - Commands (from `implementer/src`): `.venv/bin/python -m pytest tests/test_settings.py -v` then full `.venv/bin/python -m pytest tests -v`.
-    - Commit finished work (and any stabilized partial work) on `implementer/task-32-settings-core`; hand off with RESULT / BRANCH / COMMIT. If blocked, commit a `RESULT: FAILURE` checkpoint with the blocker instead.
+  - Branch: `implementer/task-32-settings-core` (base `main`). Attempt 1 timed out after 1,200s with uncommitted partial work, no commit.
+  - Checkpoint (Architect-verified): uncommitted changes on the branch — new `src/todo_md/settings.py` (`Settings` dataclass with `lists_dir`/`theme`/`completed_visible`, `system_default_theme`, `load_settings`, `save_settings`, `resolve_theme`; `tests/test_settings.py` 19/19 passing), `theme.py` deleted, `app.py` + `__init__.py` imports updated, `tests/test_theme.py` → `tests/test_settings.py`.
+  - Remaining scope: one stale import (`tests/test_gui_theme.py:7`), full-suite run, commit. No blockers.
+  - Prompt (revised, narrow corrective sub-task):
+    - You are the Implementer continuing Task 32 on branch `implementer/task-32-settings-core`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`.
+    - Current state (verified by the Architect): uncommitted working-tree changes — new `src/todo_md/settings.py` (settings core, 19/19 tests passing in `tests/test_settings.py`), `src/todo_md/theme.py` deleted, `src/todo_md/app.py` and `src/todo_md/__init__.py` updated, `tests/test_theme.py` renamed to `tests/test_settings.py`.
+    - Remaining work: (1) fix the last stale import — `tests/test_gui_theme.py:7` `from todo_md.theme import system_default_theme` → `from todo_md.settings import system_default_theme`; (2) confirm zero other references: `grep -rn 'todo_md.theme\|from .theme\|import theme' src/todo_md src/tests` (ignoring `__pycache__`) must be empty; (3) run the full suite from `implementer/src`: `.venv/bin/python -m pytest tests -v` — no failures or errors (2 gated integration tests may stay skipped); (4) stage and commit ALL Task 32 work on `implementer/task-32-settings-core` (settings.py, theme.py deletion, app.py, __init__.py, both test files; the VERSION pre-commit bump is expected).
+    - Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/push; no commit to `main`; no destructive working-tree operations.
+    - Acceptance criteria: `settings.py` exposes `Settings`/`load_settings`/`save_settings`/`resolve_theme`/`system_default_theme`; `theme.py` gone with zero references; full suite green.
+    - Hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
 
 ## Queue
 
