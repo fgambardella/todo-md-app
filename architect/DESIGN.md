@@ -8,7 +8,7 @@ Architect-owned compact snapshot of the current architecture. Not a journal; his
 - Every list is persisted as its own plain Markdown file with GFM checkbox syntax — no database.
 - Layered: domain models → Markdown storage → headless controller (view-model) → Tkinter GUI; all business logic testable without a display.
 - Testing: pytest; full suite `.venv/bin/python -m pytest tests -v` from `implementer/src` (system Python is PEP-668 managed).
-- App data lives in `~/.todo-md-app/lists/` (one `.md` per list); the theme setting lives in a dedicated `~/.todo-md-app/config/settings.json`.
+- App data lives in `~/.todo-md-app/lists/` (one `.md` per list); app settings live in a dedicated `~/.todo-md-app/config/settings.json`.
 - Primary target OS: macOS; system theme detection via `defaults read -g AppleInterfaceStyle` with graceful fallback.
 
 ## Component Architecture
@@ -19,7 +19,7 @@ implementer/src/
 │   ├── __init__.py     # package exports
 │   ├── models.py       # Domain: TodoItem, TodoList
 │   ├── storage.py      # Persistence: MarkdownListStore
-│   ├── theme.py        # Headless theme config (load/save/system detection)
+│   ├── settings.py     # Headless settings config (Settings, load/save, theme resolution)
 │   ├── version.py      # Headless version loader (get_version, reads VERSION)
 │   ├── app.py          # TodoController (headless) + TodoApp (tkinter GUI)
 │   ├── __main__.py     # Entry point: python -m todo_md
@@ -32,7 +32,7 @@ Repo-level: `implementer/src/scripts/bump_version.sh` (+ `--install-hook`) maint
 
 - **Domain** — `todo_md/models.py`: `TodoItem(text, done, created)`, `TodoList(name, items)` with validated add/toggle/remove/rename.
 - **Persistence** — `todo_md/storage.py`: `MarkdownListStore(data_dir)`; atomic writes (temp file + `os.replace`); names sanitized to `[A-Za-z0-9_-]`; `lists()` picks up `.md` files only.
-- **Theme config** — `todo_md/theme.py`: headless (no tkinter); system-default detection; atomic JSON load/save of `settings.json` in a config dir; validates against `("light", "dark")`.
+- **Settings config** — `todo_md/settings.py`: headless (no tkinter); `Settings(theme, lists_dir, completed_visible)` dataclass (theme ∈ `("light", "dark", "system")` default `"system"`, `lists_dir` None = app default dir, `completed_visible` int ≥ 0 default 10, 0 hides all completed); `load_settings` never raises (legacy single-key `{"theme"}` files load; missing/corrupt → defaults); `save_settings` validates (ValueError) and writes `settings.json` atomically; `resolve_theme` resolves `"system"` via `system_default_theme` (macOS `defaults read -g AppleInterfaceStyle`, fallback `"light"`) at call time — the resolved value is never persisted; only explicit user choices are written.
 - **Version** — `todo_md/version.py`: headless `get_version()` reads `todo_md/VERSION` package-relative, returns `0.0.0` if missing/unreadable. `TodoApp` shows `v<version>` in a bottom-right `tk.Label` (font 8, `version_fg` palette entry, unobtrusive); on the fallback path its background is pinned to the palette `bg` and refreshed with `fg` on theme toggle (unset bg stays on a system color), native path leaves bg unset.
 - **View-model** — `todo_md/app.py` (`TodoController`): bridges models and storage; every mutation persists immediately; no tkinter at module import; exposes `data_dir` (optional constructor override, defaulting to the store's) which the GUI uses to derive data/config locations.
 - **Presentation** — `todo_md/app.py` (`TodoApp`): list sidebar (create/delete), checkbutton item rows with luminance-adaptive label colors, per-row trash-icon delete (`tk.Label` + bound `<Button-1>`, pre-sized `trash_18.png` asset loaded directly; 512×512 source kept in `assets/`), entry+Add with muted-gray placeholder hints (cleared on focus-in, restored on empty focus-out only when the entry has genuinely lost focus — never re-inserted into a still-focused field after submit — counted as empty on submit), theme switcher button. macOS dock icon set at startup via `root.iconphoto` from `assets/dock_icon.png` (kept alive in `self._dock_icon`; fail-soft: missing/unsupported icon is skipped, startup unaffected). Destructive GUI actions (delete list, delete item) are gated by a modal `messagebox.askyesno` (lazy-imported per handler); No is a full no-op. `_apply_theme` tries `tk appappearance`, falls back to ttk "clam" + explicit palettes stored in `self._palette` on `TclError`; `_refresh_items` applies the palette bg to every row widget.
@@ -41,15 +41,15 @@ Repo-level: `implementer/src/scripts/bump_version.sh` (+ `--install-hook`) maint
 ## Data Models & Flow
 
 - `TodoItem(text: str, done: bool, created: float)`; `TodoList(name: str, items: list[TodoItem])`.
-- Disk: `<lists>/<Name>.md` = `# <Name>` header + `- [ ]`/`- [x]` lines; plus the theme setting JSON `{"theme": "light"|"dark"}` at `<app-root>/config/settings.json` (config dir sits alongside, never inside, the lists dir).
+- Disk: `<lists>/<Name>.md` = `# <Name>` header + `- [ ]`/`- [x]` lines; plus the settings JSON `{"theme": "light"|"dark"|"system", "lists_dir": str|null, "completed_visible": int}` at `<app-root>/config/settings.json` (config dir sits alongside, never inside, the lists dir; legacy single-key theme files load compatibly).
 - Data flow: GUI → `TodoController` → `MarkdownListStore` → `.md` files; store re-read after each mutation drives UI refresh.
-- Theme flow: startup → `load_theme` (first start: detect system default and persist) → `_apply_theme` → build UI → idempotent re-apply after `_build_ui` so the palette reaches built widgets. Toggle → `save_theme` (to `config_dir`) → re-apply → `_refresh_items` (row bgs + adaptive label fgs re-resolve).
+- Theme flow: startup → `load_settings` → `resolve_theme` (`"system"` detected live, never persisted; no file is written on first start) → `_apply_theme` → build UI → idempotent re-apply after `_build_ui` so the palette reaches built widgets. Toggle → `save_settings` (full payload) → re-apply → `_refresh_items` (row bgs + adaptive label fgs re-resolve).
 
 ## External Interfaces
 
 - **CLI**: `python -m todo_md` (from `implementer/src`, using the venv); `implementer/src/scripts/bump_version.sh [--install-hook]` (from repo root).
 - **Git**: installed pre-commit hook bumps `todo_md/VERSION` (patch) and stages it in every commit — every commit therefore carries a version bump.
-- **Disk**: `~/.todo-md-app/lists/*.md` + theme setting JSON at `~/.todo-md-app/config/settings.json` (UTF-8, key `theme`).
+- **Disk**: `~/.todo-md-app/lists/*.md` + settings JSON at `~/.todo-md-app/config/settings.json` (UTF-8; keys `theme`, `lists_dir`, `completed_visible`).
 - **OS**: macOS `defaults read -g AppleInterfaceStyle` (dark → "dark"; non-macOS or error → "light").
 - **Tk/Tcl**: on this machine (Tcl/Tk 9.0.4) `tk appappearance` raises `TclError` (clam fallback is always live), `compound="image"` is rejected (use `"center"`), and the clam `TEntry` field element fills from the `fieldbackground` element option — setting `background` alone leaves a light field in dark mode; clam `TButton` likewise needs an explicit `style.map("TButton", background=[("active", …)])` or hover falls back to a light `activeBackground` that hides light text. Dark-mode entry fill (`#383838`) is deliberately slightly lighter than the listbox background (`#2d2d2d`): identical colors read as entries looking darker (optical effect). GUI test quirk: destroying a Tk root that was never `update()`d corrupts the next in-process Tk instance (later `update()` hits Trace/BPT trap) — call `root.update()` before `destroy()` in every GUI test.
 

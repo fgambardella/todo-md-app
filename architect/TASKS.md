@@ -20,25 +20,15 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 - GUI: list sidebar (create via button or Enter, delete), checkbutton item rows, add-item entry, per-item trash-icon delete; destructive actions gated by a Yes/No popup.
 - Both input fields (new list, new item) show muted-gray placeholder hints: cleared on focus-in, counted as empty on submit.
 - Readability: item label colors adapt to background luminance in both themes; entry fills follow the palette (slightly lighter than list background in dark mode).
-- Theming: persisted light/dark setting with system-default detection on first start; switcher flips the whole window including item rows at startup and on toggle; buttons use darker hover/press fills; stored in `~/.todo-md-app/config/`.
 - Versioning: version lives in `todo_md/VERSION`, auto-incremented (patch) by a pre-commit hook; GUI shows it as a small low-contrast bottom-right badge that adapts on theme toggle.
-- Dock icon: on macOS a custom dock icon is set at startup from a bundled PNG (JPEG source kept); missing/unsupported icons fail soft so startup is unaffected.
+- Dock icon: macOS startup sets a custom dock icon from a bundled PNG (JPEG source kept); missing/unsupported icons fail soft.
+- Settings: headless `settings.json` core (theme light/dark/system — system detected live at startup, never persisted; lists_dir; completed-visible count) with legacy-compat load and atomic save; theme switcher flips the whole window including item rows; buttons use darker hover/press fills; stored in `~/.todo-md-app/config/`.
 - Build: `scripts/build_app.sh` (PyInstaller, arm64) builds a self-contained launchable `dist/todo-md.app` with post-build smoke check and custom Finder icon (`.icns` generated at build time); PyInstaller is dev-only (runtime stays stdlib-only).
 - Release packaging: `scripts/release_package.sh` builds, validates strict `X.Y.Z`, and zips the bundle as `dist/todo-md-<version>-arm64.zip` (app at zip root, no `__MACOSX`); gated end-to-end test.
 
 ## Active Task
 
-- **Task 32 (S)** — Settings core module (macro: user settings page, overall size L, ordered queue 32→36).
-  - Branch: `implementer/task-32-settings-core` (base `main`). Attempt 1 timed out after 1,200s with uncommitted partial work, no commit.
-  - Checkpoint (Architect-verified): uncommitted changes on the branch — new `src/todo_md/settings.py` (`Settings` dataclass with `lists_dir`/`theme`/`completed_visible`, `system_default_theme`, `load_settings`, `save_settings`, `resolve_theme`; `tests/test_settings.py` 19/19 passing), `theme.py` deleted, `app.py` + `__init__.py` imports updated, `tests/test_theme.py` → `tests/test_settings.py`.
-  - Remaining scope: one stale import (`tests/test_gui_theme.py:7`), full-suite run, commit. No blockers.
-  - Prompt (revised, narrow corrective sub-task):
-    - You are the Implementer continuing Task 32 on branch `implementer/task-32-settings-core`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`.
-    - Current state (verified by the Architect): uncommitted working-tree changes — new `src/todo_md/settings.py` (settings core, 19/19 tests passing in `tests/test_settings.py`), `src/todo_md/theme.py` deleted, `src/todo_md/app.py` and `src/todo_md/__init__.py` updated, `tests/test_theme.py` renamed to `tests/test_settings.py`.
-    - Remaining work: (1) fix the last stale import — `tests/test_gui_theme.py:7` `from todo_md.theme import system_default_theme` → `from todo_md.settings import system_default_theme`; (2) confirm zero other references: `grep -rn 'todo_md.theme\|from .theme\|import theme' src/todo_md src/tests` (ignoring `__pycache__`) must be empty; (3) run the full suite from `implementer/src`: `.venv/bin/python -m pytest tests -v` — no failures or errors (2 gated integration tests may stay skipped); (4) stage and commit ALL Task 32 work on `implementer/task-32-settings-core` (settings.py, theme.py deletion, app.py, __init__.py, both test files; the VERSION pre-commit bump is expected).
-    - Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/push; no commit to `main`; no destructive working-tree operations.
-    - Acceptance criteria: `settings.py` exposes `Settings`/`load_settings`/`save_settings`/`resolve_theme`/`system_default_theme`; `theme.py` gone with zero references; full suite green.
-    - Hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
+None.
 
 ## Queue
 
@@ -57,8 +47,8 @@ None.
 
 ## Recently Completed
 
+- Task 32 — settings core: `todo_md/settings.py` (`Settings` dataclass, legacy-compat `load_settings`, validating atomic `save_settings`, `resolve_theme` with live never-persisted system detection); `theme.py` removed, GUI/tests migrated; verified 101 passed/2 skipped (b0c3be2).
 - Task 31b — v0.2.1 release cut (Architect-direct per user): VERSION commit lands at `0.2.1` (ecd4eb7); package rebuilt on `main` → `dist/todo-md-0.2.1-arm64.zip` (sha256 2ba5021d…); tagged `v0.2.1`, pushed per explicit request; user attaches zip in GitHub web release UI.
 - Task 31a — one-command release packaging: `scripts/release_package.sh` (build → strict X.Y.Z validation → ditto zip, app at zip root) + static/gated tests; verified 90 passed/2 skipped + `RUN_RELEASE_TESTS=1` 5/5 (3be777e, merged c35805c).
 - Task 30 — pre-sized trash icon: 18×18 RGBA `assets/trash_18.png` (sips from the 512×512 source, which is kept); GUI loads it directly, `.subsample(28)` gone; 2 GUI tests updated; verified 86/1-skip (d2f6964).
 - Task 29 — explicit `TodoController.data_dir` (optional override, defaults to store's); `TodoApp` derives from the controller, no more store reach-in; 2 new headless tests; verified 86/1-skip (790ee86).
-- Task 28 — debt triage and reduction plan (Architect): 4 debt items analysed; 2 accepted as constraints with rationale in `decisions/2026-09-27-debt-triage.md`; 2 executed as tasks 29/30.
