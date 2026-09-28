@@ -19,26 +19,16 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 - Headless controller: create/delete lists, add/toggle/remove items; every mutation persisted immediately.
 - GUI: list sidebar (create via button or Enter, delete), checkbutton item rows, add-item entry, per-item trash-icon delete; destructive actions gated by a Yes/No popup.
 - Both input fields (new list, new item) show muted-gray placeholder hints: cleared on focus-in, counted as empty on submit.
-- Readability: item label colors adapt to background luminance in both themes; entry fills follow the palette (slightly lighter than list background in dark mode).
+- Readability: item label colors adapt to background luminance in both themes; entry fills follow the palette.
 - Versioning: version lives in `todo_md/VERSION`, auto-incremented (patch) by a pre-commit hook; GUI shows it as a small low-contrast bottom-right badge that adapts on theme toggle.
 - Dock icon: macOS sets a custom dock icon at startup from a bundled PNG (JPEG source kept); fails soft.
-- Settings: headless `settings.json` core (theme light/dark/system, detected live and never persisted; lists_dir; completed-visible count), legacy-compat load, atomic save; startup honors a saved lists dir; config dir fixed at `~/.todo-md-app/config/`; theme switcher flips the whole window; darker hover/press button fills.
-- Build: `scripts/build_app.sh` (PyInstaller, arm64) builds a self-contained launchable `dist/todo-md.app` with post-build smoke check and custom Finder icon (`.icns` generated at build time); PyInstaller is dev-only (runtime stays stdlib-only).
+- Settings: headless `settings.json` core (theme light/dark/system, detected live and never persisted; lists_dir; completed-visible count), legacy-compat load, atomic save; startup honors a saved lists dir; config dir fixed at `~/.todo-md-app/config/`; theme switcher flips the whole window; darker hover/press button fills; item view hides completed beyond the count (top-first, 0 hides all).
+- Build: `scripts/build_app.sh` (PyInstaller, dev-only) builds a launchable `dist/todo-md.app` with post-build smoke check and custom Finder icon (`.icns` at build time); runtime stays stdlib-only.
 - Release packaging: `scripts/release_package.sh` builds, validates strict `X.Y.Z`, and zips the bundle as `dist/todo-md-<version>-arm64.zip` (app at zip root, no `__MACOSX`); gated end-to-end test.
 
 ## Active Task
 
-- **Task 34 (S)** — Completed-items display filter.
-  - Branch: `implementer/task-34-completed-filter` (base `main`).
-  - Prompt:
-    - You are the Implementer. Work ONLY on branch `implementer/task-34-completed-filter`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`. Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/push; no commit to `main`; no destructive working-tree operations.
-    - Read `architect/DESIGN.md` (Settings config, View model sections), `src/todo_md/controller.py`, `src/todo_md/settings.py`, and the relevant tests.
-    - Changes: implement the pure display-side filter `visible_items(items, completed_visible)` (headless, in the controller layer or a small helper it uses): `items` is the ordered item list, `completed_visible` is an int ≥ 0. When the number of completed items exceeds `completed_visible`, hide the excess starting from the TOP of the list (the bottom-most completed items stay visible); all incomplete items always stay. `completed_visible == 0` hides every completed item. Storage on disk always keeps every item — this is display-only, no storage changes.
-    - Keep it pure and deterministic (no I/O, no tkinter) so it is trivially testable; wire it where the GUI currently builds rows so item rows reflect the filter (GUI may simply call it; no other GUI redesign). If wiring requires reading `settings.completed_visible` in the GUI, do the minimal change.
-    - Tests (headless): filter keeps all when completed ≤ N; hides excess from the top when completed > N; 0 hides all completed; all incomplete always visible; order of visible items preserved; disk/storage untouched (no test may lose items).
-    - Acceptance criteria: pure filter function exists and is used for row display; filter semantics exactly as above; full suite green.
-    - Commands (from `implementer/src`): `.venv/bin/python -m pytest tests -v` (no failures/errors; 2 gated integration tests may stay skipped).
-    - Commit finished work (and stabilized partial work) on the branch; hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
+None.
 
 ## Queue
 
@@ -55,8 +45,8 @@ None.
 
 ## Recently Completed
 
-- Task 33 — startup settings wiring: fixed config dir `~/.todo-md-app/config` (never derived from the lists dir, overridable for tests), headless `startup_dirs` derives data dir from saved `lists_dir` (default created on demand), store/controller built with it; verified 106 passed/2 skipped (998778c).
+- Task 34 — completed-items display filter: pure `visible_items(items, completed_visible)` (top-first hiding, 0 hides all, order preserved, storage untouched) + GUI row wiring via id-based visibility; recovered from committed checkpoint after timeout; verified 116 passed/2 skipped (bf3ab84).
+- Task 33 — startup settings wiring: fixed config dir `~/.todo-md-app/config` (never derived from the lists dir, overridable for tests), headless `startup_dirs` derives data dir from saved `lists_dir` (default created on demand), store/controller built with it; verified 106 passed/2 skipped (998778c, merged 25f743a).
 - Task 32 — settings core: `todo_md/settings.py` (`Settings` dataclass, legacy-compat `load_settings`, validating atomic `save_settings`, `resolve_theme` with live never-persisted system detection); `theme.py` removed, GUI/tests migrated; verified 101 passed/2 skipped (b0c3be2, merged adbedc4).
 - Task 31b — v0.2.1 release cut (Architect-direct per user): VERSION commit lands at `0.2.1` (ecd4eb7); package rebuilt on `main` → `dist/todo-md-0.2.1-arm64.zip` (sha256 2ba5021d…); tagged `v0.2.1`, pushed per explicit request; user attaches zip in GitHub web release UI.
-- Task 31a — one-command release packaging: `scripts/release_package.sh` (build → strict X.Y.Z validation → ditto zip, app at zip root) + static/gated tests; verified 90 passed/2 skipped + `RUN_RELEASE_TESTS=1` 5/5 (3be777e, merged c35805c).
 - Task 30 — pre-sized trash icon: 18×18 RGBA `assets/trash_18.png` (sips from the 512×512 source, which is kept); GUI loads it directly, `.subsample(28)` gone; 2 GUI tests updated; verified 86/1-skip (d2f6964).
