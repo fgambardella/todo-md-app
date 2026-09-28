@@ -28,11 +28,19 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None.
+- **Task 33 (S)** — Startup settings wiring + fixed config dir.
+  - Branch: `implementer/task-33-startup-settings` (base `main`).
+  - Prompt:
+    - You are the Implementer. Work ONLY on branch `implementer/task-33-startup-settings`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`. Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/push; no commit to `main`; no destructive working-tree operations.
+    - Read `architect/DESIGN.md` (Settings config, Data models sections) and `src/todo_md/app.py` (config_dir/data_dir wiring in `TodoApp.__init__` and `run()`), `src/todo_md/settings.py`, `src/tests/test_headless_smoke.py`, `src/tests/test_settings.py`.
+    - Changes: (1) config dir is FIXED at `~/.todo-md-app/config/` and must no longer be derived from the lists dir (changing the lists path must not move the settings file); support an injectable/overridable config root (optional parameter on `TodoApp`/`run` or a module-level helper with the default) so tests can point it at a temp dir; (2) on startup the app loads settings first, then derives the effective lists data dir (`settings.lists_dir` or default `~/.todo-md-app/lists/`, created on demand) and creates the store/controller with it; (3) keep the theme behavior exactly as-is (`resolve_theme` on loaded settings); (4) make the effective data dir observable (e.g. `self.data_dir` on the app) for later tasks — no sidebar-reload logic yet.
+    - Tests (headless): config dir fixed and independent of a saved `lists_dir`; effective data dir from a saved `lists_dir` (temp dirs); default data dir on a fresh run (use overrides — never write real user data in tests); existing GUI smoke/behavior tests stay green.
+    - Acceptance criteria: startup reads settings → derives data dir → builds store with it; config dir never inside the lists dir; theme behavior unchanged; full suite green.
+    - Commands (from `implementer/src`): `.venv/bin/python -m pytest tests -v` (no failures/errors; 2 gated integration tests may stay skipped).
+    - Commit finished work (and stabilized partial work) on the branch; hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
 
 ## Queue
 
-- **Task 33 (S)** — Startup wiring for user settings: `run()` loads settings from a FIXED config dir `~/.todo-md-app/config/` (config dir must no longer be derived from the lists dir, otherwise changing the lists path would move the settings file); data dir derived from `settings.lists_dir` (default `~/.todo-md-app/lists/`, created on demand); list-dir location in the GUI/README wording unaffected; headless tests incl. temp config/data dirs.
 - **Task 34 (S)** — Completed-items display filter: controller/view-model logic `visible_items(items, completed_visible)` — when completed count exceeds N, hide the excess starting from the top of the list (bottom-most completed stay); 0 hides all completed; storage on disk always keeps every item. Headless tests only; no GUI change.
 - **Task 35 (M)** — Settings window (break down into sequential micro-tasks):
   - 35a: `"Settings"` button in the main window opening a Toplevel with: lists-folder row (Entry + `Browse…` via `filedialog.askdirectory` + `Reset to default`), theme radiobuttons (System default / Light / Dark), completed-visible Spinbox (0–999, 0 = hide all), Save/Cancel; window pre-filled from current settings; GUI tests for construction and pre-fill.
