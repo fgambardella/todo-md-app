@@ -26,6 +26,7 @@ __all__ = [
     "DEFAULT_CONFIG_DIR",
     "DEFAULT_DATA_DIR",
     "startup_dirs",
+    "visible_items",
 ]
 
 # App data root: the config dir is FIXED here (settings.json lives in
@@ -62,6 +63,35 @@ def dock_icon_path() -> str:
     return os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "assets", "dock_icon.png"
     )
+
+
+def visible_items(
+    items: list[TodoItem], completed_visible: int
+) -> list[TodoItem]:
+    """Pure, display-only filter: which items the GUI shows for one list.
+
+    ``items`` is the ordered item list; ``completed_visible`` is how many
+    completed items stay visible (an int >= 0).  When the number of
+    completed items exceeds ``completed_visible``, the excess is hidden
+    starting from the TOP of the list — the bottom-most completed items
+    remain visible.  All incomplete items always stay, ``0`` hides every
+    completed item, and the order of the returned items is preserved.
+
+    This never touches storage: the on-disk list keeps every item; the
+    result is a new list (never the input) for display only.
+    """
+    if completed_visible < 0:
+        raise ValueError(f"completed_visible must be >= 0, got {completed_visible!r}")
+    to_hide = sum(1 for item in items if item.done) - completed_visible
+    if to_hide <= 0:
+        return list(items)
+    result: list[TodoItem] = []
+    for item in items:
+        if item.done and to_hide > 0:
+            to_hide -= 1
+            continue
+        result.append(item)
+    return result
 
 
 class TodoController:
@@ -569,7 +599,16 @@ class TodoApp:
 
         todo_list = self.controller.open_list(self.current_list)
         row_bg = self._palette["bg"] if self._palette is not None else None
+        # Display-only completed-items filter: hidden rows are skipped here,
+        # but original list indices (for toggle/delete) and on-disk storage
+        # are untouched. Identity is used because TodoItem is an eq dataclass
+        # and duplicate text/done pairs must not be conflated.
+        visible_ids = {
+            id(item) for item in visible_items(todo_list.items, self.settings.completed_visible)
+        }
         for index, item in enumerate(todo_list.items):
+            if id(item) not in visible_ids:
+                continue
             row_kwargs = {"bg": row_bg} if row_bg is not None else {}
             row = tk.Frame(self.items_frame, **row_kwargs)
             row.pack(anchor="w", fill=tk.X)
