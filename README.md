@@ -70,7 +70,7 @@ cd src
 .venv/bin/python -m pytest tests -v
 ```
 
-Expected: 86 passing tests (plus 1 skipped gated full-build test, enabled with `RUN_BUILD_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_theme.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`.
+Expected: 90 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_theme.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`.
 
 ## Running the app
 
@@ -98,3 +98,17 @@ bash scripts/build_app.sh
 - The bundle shows a custom Finder icon: the script generates a `.icns` from `todo_md/assets/dock_icon.png` via macOS `sips`/`iconutil` at build time.
 - The script ends with a smoke check: the bundle must launch, stay alive ~3s without any traceback in stderr, then it is terminated.
 - The full build is also covered by a gated integration test (skipped by default to keep the suite fast): from `implementer/src`, `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v`.
+
+## Packaging and release
+
+One command builds the bundle and packages the distributable release zip:
+
+```bash
+cd implementer/src
+bash scripts/release_package.sh
+```
+
+- Reuses `build_app.sh` (arm64-only guard, launch smoke check), validates `todo_md/VERSION` is a strict `X.Y.Z`, then zips `dist/todo-md.app` via `ditto -c -k --noextattr --noqtn` into `dist/todo-md-<version>-arm64.zip` with `todo-md.app` at the zip root (no wrapper dir, no `__MACOSX` entries); prints the zip path, size, and SHA-256.
+- A GitHub Release is not a repo folder: the zip travels as a **release asset**. Create the release in the GitHub web UI (repo → **Releases** → **Draft a new release**), set the tag to `v<version>` matching the zip, and attach the zip as an asset.
+- Artifacts stay in the gitignored `dist/`; never commit them.
+- Gated end-to-end test (real build + zip assertions), from `implementer/src`: `RUN_RELEASE_TESTS=1 .venv/bin/python -m pytest tests/test_release_package.py -v`.
