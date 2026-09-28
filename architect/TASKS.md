@@ -28,11 +28,20 @@ Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies).
 
 ## Active Task
 
-None.
+- **Task 34 (S)** — Completed-items display filter.
+  - Branch: `implementer/task-34-completed-filter` (base `main`).
+  - Prompt:
+    - You are the Implementer. Work ONLY on branch `implementer/task-34-completed-filter`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`. Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/push; no commit to `main`; no destructive working-tree operations.
+    - Read `architect/DESIGN.md` (Settings config, View model sections), `src/todo_md/controller.py`, `src/todo_md/settings.py`, and the relevant tests.
+    - Changes: implement the pure display-side filter `visible_items(items, completed_visible)` (headless, in the controller layer or a small helper it uses): `items` is the ordered item list, `completed_visible` is an int ≥ 0. When the number of completed items exceeds `completed_visible`, hide the excess starting from the TOP of the list (the bottom-most completed items stay visible); all incomplete items always stay. `completed_visible == 0` hides every completed item. Storage on disk always keeps every item — this is display-only, no storage changes.
+    - Keep it pure and deterministic (no I/O, no tkinter) so it is trivially testable; wire it where the GUI currently builds rows so item rows reflect the filter (GUI may simply call it; no other GUI redesign). If wiring requires reading `settings.completed_visible` in the GUI, do the minimal change.
+    - Tests (headless): filter keeps all when completed ≤ N; hides excess from the top when completed > N; 0 hides all completed; all incomplete always visible; order of visible items preserved; disk/storage untouched (no test may lose items).
+    - Acceptance criteria: pure filter function exists and is used for row display; filter semantics exactly as above; full suite green.
+    - Commands (from `implementer/src`): `.venv/bin/python -m pytest tests -v` (no failures/errors; 2 gated integration tests may stay skipped).
+    - Commit finished work (and stabilized partial work) on the branch; hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
 
 ## Queue
 
-- **Task 34 (S)** — Completed-items display filter: controller/view-model logic `visible_items(items, completed_visible)` — when completed count exceeds N, hide the excess starting from the top of the list (bottom-most completed stay); 0 hides all completed; storage on disk always keeps every item. Headless tests only; no GUI change.
 - **Task 35 (M)** — Settings window (break down into sequential micro-tasks):
   - 35a: `"Settings"` button in the main window opening a Toplevel with: lists-folder row (Entry + `Browse…` via `filedialog.askdirectory` + `Reset to default`), theme radiobuttons (System default / Light / Dark), completed-visible Spinbox (0–999, 0 = hide all), Save/Cancel; window pre-filled from current settings; GUI tests for construction and pre-fill.
   - 35b: Save flow — persist via `save_settings`; on Save re-apply: theme (`_apply_theme` + `_refresh_items`), lists dir (relocation per Task 36 + sidebar reload), completed filter (items refresh); Cancel = full no-op; GUI tests incl. live theme change and sidebar reload after dir change.
