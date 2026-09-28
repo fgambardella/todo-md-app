@@ -205,6 +205,7 @@ class TodoApp:
             config_dir if config_dir is not None else DEFAULT_CONFIG_DIR
         )
         self.current_list: str | None = None
+        self.settings_window = None
         self._item_rows: list[tuple] = []
         self._palette: dict | None = None
         # entry widget -> its placeholder text (empty fields show this muted
@@ -293,6 +294,12 @@ class TodoApp:
             left, text=self._theme_button_text(), command=self._on_toggle_theme
         )
         self._theme_btn.pack(fill=tk.X, pady=(6, 0))
+
+        # --- settings button: opens the Toplevel settings window ---------
+        self._settings_btn = ttk.Button(
+            left, text="Settings", command=self._open_settings
+        )
+        self._settings_btn.pack(fill=tk.X, pady=(6, 0))
 
         # --- right frame: items ------------------------------------------
         right = ttk.Frame(self.root, padding=8)
@@ -492,6 +499,118 @@ class TodoApp:
         self._theme_btn.config(text=self._theme_button_text())
         # Re-resolve the luminance-adaptive label colors.
         self._refresh_items()
+
+    # -- settings window --------------------------------------------------
+
+    def _open_settings(self) -> None:
+        """Open the Toplevel settings window (single instance).
+
+        The window is pre-filled from the in-memory ``self.settings``
+        (effective lists dir = ``settings.lists_dir`` or the app default)
+        and every control is bound to a small state holder on ``self``
+        (StringVar/IntVar) so a later Save handler can read the edited
+        values in one place. Save/Cancel are trivial close-only stubs in
+        this task — nothing is written to disk.
+        """
+        import tkinter as tk
+        from tkinter import ttk
+
+        if (
+            getattr(self, "settings_window", None) is not None
+            and self.settings_window.winfo_exists()
+        ):
+            self.settings_window.lift()
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Settings")
+        win.geometry("420x280")
+        win.transient(self.root)
+        self.settings_window = win
+
+        # State holders: one var per control group (lists folder, theme,
+        # completed-visible count).
+        self._settings_lists_dir_var = tk.StringVar(
+            value=self.settings.lists_dir or DEFAULT_DATA_DIR
+        )
+        self._settings_theme_var = tk.StringVar(value=self.settings.theme)
+        self._settings_completed_var = tk.IntVar(value=self.settings.completed_visible)
+
+        # (a) lists-folder row: entry + Browse… + Reset to default --------
+        folder_row = ttk.Frame(win, padding=(10, 8))
+        folder_row.pack(fill=tk.X)
+        ttk.Label(folder_row, text="Lists folder:").grid(
+            row=0, column=0, columnspan=3, sticky="w", pady=(0, 2)
+        )
+        ttk.Entry(folder_row, textvariable=self._settings_lists_dir_var).grid(
+            row=1, column=0, columnspan=3, sticky="we", pady=(0, 2)
+        )
+        ttk.Button(
+            folder_row,
+            text="Browse…",
+            command=lambda: self._settings_browse(self._settings_lists_dir_var),
+        ).grid(row=2, column=0, sticky="w", padx=(0, 4))
+        self._settings_reset_btn = ttk.Button(
+            folder_row,
+            text="Reset to default",
+            command=lambda: self._settings_lists_dir_var.set(DEFAULT_DATA_DIR),
+        )
+        self._settings_reset_btn.grid(row=2, column=1, columnspan=2, sticky="w")
+        folder_row.columnconfigure(0, weight=1)
+
+        # (b) theme radiobuttons ------------------------------------------
+        theme_row = ttk.LabelFrame(win, text="Theme", padding=(10, 8))
+        theme_row.pack(fill=tk.X)
+        self._settings_theme_rads = []
+        for value, label in (("system", "System default"), ("light", "Light"), ("dark", "Dark")):
+            rad = ttk.Radiobutton(
+                theme_row, text=label, value=value, variable=self._settings_theme_var
+            )
+            rad.pack(anchor="w")
+            self._settings_theme_rads.append(rad)
+
+        # (c) completed-visible spinbox (0 = hide all completed) ----------
+        cv_row = ttk.Frame(win, padding=(10, 8))
+        cv_row.pack(fill=tk.X)
+        ttk.Label(cv_row, text="Completed items visible:").pack(side=tk.LEFT)
+        self._settings_spinbox = ttk.Spinbox(
+            cv_row, from_=0, to=999, width=6, textvariable=self._settings_completed_var
+        )
+        self._settings_spinbox.pack(side=tk.LEFT, padx=(8, 0))
+
+        # (d) Save / Cancel (stubs: close only — apply-on-Save is a later
+        # micro-task, so this window never writes settings on its own). ---
+        bottom = ttk.Frame(win, padding=(10, 8))
+        bottom.pack(fill=tk.X, side=tk.BOTTOM)
+        self._settings_save_btn = ttk.Button(
+            bottom, text="Save", command=self._settings_on_save
+        )
+        self._settings_save_btn.pack(side=tk.RIGHT, padx=(6, 0))
+        self._settings_cancel_btn = ttk.Button(
+            bottom, text="Cancel", command=self._close_settings
+        )
+        self._settings_cancel_btn.pack(side=tk.RIGHT)
+
+        win.protocol("WM_DELETE_WINDOW", self._close_settings)
+        win.update()
+
+    def _settings_browse(self, var) -> None:
+        """Pick a directory via filedialog and store it in ``var``."""
+        from tkinter import filedialog  # lazy: keep module importable headless
+
+        path = filedialog.askdirectory(parent=self.settings_window, initialdir=var.get())
+        if path:
+            var.set(path)
+
+    def _settings_on_save(self) -> None:
+        """Save stub for this task: closes the window, writes nothing."""
+        self._close_settings()
+
+    def _close_settings(self) -> None:
+        win = getattr(self, "settings_window", None)
+        if win is not None and win.winfo_exists():
+            win.destroy()
+        self.settings_window = None
 
     # -- list-frame handlers ----------------------------------------------
 
