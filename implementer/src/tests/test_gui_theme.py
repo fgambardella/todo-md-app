@@ -4,7 +4,7 @@ import json
 
 from todo_md.app import TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
-from todo_md.theme import system_default_theme
+from todo_md.settings import system_default_theme
 
 
 def lum(root, color):
@@ -58,10 +58,11 @@ def test_first_start_detects_system_default(tmp_path):
         app.root.update()
         expected = system_default_theme()
         assert app.theme == expected
+        # The "system" default is resolved at display time and is never
+        # persisted on a first start (settings.json is only written on change).
+        assert app.settings.theme == "system"
         new_path = tmp_path / "config" / "settings.json"
-        assert new_path.is_file()
-        on_disk = json.loads(new_path.read_text(encoding="utf-8"))
-        assert on_disk == {"theme": app.theme}
+        assert not new_path.is_file()
     finally:
         app.root.destroy()
 
@@ -79,7 +80,11 @@ def test_toggle_persists(tmp_path):
         root.update()
         assert app.theme == "dark"
         on_disk = json.loads(new_path.read_text(encoding="utf-8"))
-        assert on_disk == {"theme": "dark"}
+        assert on_disk == {
+            "theme": "dark",
+            "lists_dir": None,
+            "completed_visible": 10,
+        }
         assert "Light" in app._theme_btn.cget("text")
         assert lum(root, app.items_frame.cget("bg")) < 0.5
 
@@ -88,7 +93,11 @@ def test_toggle_persists(tmp_path):
         root.update()
         assert app.theme == "light"
         on_disk = json.loads(new_path.read_text(encoding="utf-8"))
-        assert on_disk == {"theme": "light"}
+        assert on_disk == {
+            "theme": "light",
+            "lists_dir": None,
+            "completed_visible": 10,
+        }
         assert lum(root, app.items_frame.cget("bg")) > 0.5
     finally:
         app.root.destroy()
