@@ -1,8 +1,12 @@
-"""Tests for todo_md.storage.MarkdownListStore."""
+"""Tests for Markdown list storage and headless relocation."""
+
+import builtins
 
 import pytest
 
 from todo_md import MarkdownListStore
+from todo_md import storage
+from todo_md.storage import relocate_lists
 
 
 @pytest.fixture
@@ -144,3 +148,153 @@ def test_atomic_replace_no_partial_content(store, tmp_path):
     assert path.read_bytes() == after  # untouched by the failed write
     leftovers = [p for p in (tmp_path / "data").iterdir() if p.name.startswith(".tmp-")]
     assert leftovers == []
+
+
+def test_relocate_moves_exact_bytes_and_preserves_other_content(tmp_path):
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    contents = {
+        "my list (v2).md": b"# Manual title\r\n\r\n- [X] done\r\n\xff\x00",
+        ".hidden.md": b"no trailing newline",
+        "empty.md": b"",
+    }
+    for name, content in contents.items():
+        (source / name).write_bytes(content)
+    (source / "settings.json").write_bytes(b'{"untouched": true}\n')
+    (source / "nested.md").mkdir()
+    nested = source / "nested.md" / "child.md"
+    nested.write_bytes(b"nested list")
+    (target / "notes.txt").write_bytes(b"keep target notes")
+
+    relocate_lists(source, target, move=True)
+
+    for name, content in contents.items():
+        assert (target / name).read_bytes() == content
+        assert not (source / name).exists()
+    assert {p.name for p in source.iterdir()} == {"settings.json", "nested.md"}
+    assert (source / "settings.json").read_bytes() == b'{"untouched": true}\n'
+    assert nested.read_bytes() == b"nested list"
+    assert {p.name for p in target.iterdir()} == set(contents) | {"notes.txt"}
+    assert (target / "notes.txt").read_bytes() == b"keep target notes"
+
+
+def test_relocate_without_move_leaves_source_unchanged(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    contents = {"tasks.md": b"- [ ] task\r\n", "notes.txt": b"other\x00\xff"}
+    for name, content in contents.items():
+        (source / name).write_bytes(content)
+    target = tmp_path / "parent" / "target"
+
+    relocate_lists(str(source), str(target), move=False)
+
+    assert target.is_dir()
+    assert list(target.iterdir()) == []
+    assert {p.name: p.read_bytes() for p in source.iterdir()} == contents
+
+
+@pytest.mark.parametrize("move", [True, False])
+@pytest.mark.parametrize("existing_name", ["tasks.md", "different.md"])
+def test_relocate_rejects_populated_target_without_changes(tmp_path, move, existing_name):
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    source_contents = {"first.md": b"first\r\n", "tasks.md": b"source\xff"}
+    target_contents = {existing_name: b"existing\x00\r\n", "notes.txt": b"notes"}
+    for name, content in source_contents.items():
+        (source / name).write_bytes(content)
+    for name, content in target_contents.items():
+        (target / name).write_bytes(content)
+
+    with pytest.raises(FileExistsError, match="destination already contains Markdown"):
+        relocate_lists(source, target, move=move)
+
+    assert {p.name: p.read_bytes() for p in source.iterdir()} == source_contents
+    assert {p.name: p.read_bytes() for p in target.iterdir()} == target_contents
+
+
+@pytest.mark.parametrize("move", [True, False])
+@pytest.mark.parametrize("source_exists", [True, False])
+def test_relocate_empty_or_missing_source_creates_parents(tmp_path, move, source_exists):
+    source = tmp_path / "source"
+    if source_exists:
+        source.mkdir()
+    target = tmp_path / "one" / "two" / "target"
+
+    relocate_lists(source, target, move=move)
+
+    assert target.is_dir()
+    assert list(target.iterdir()) == []
+    assert source.exists() == source_exists
+    if source_exists:
+        assert list(source.iterdir()) == []
+
+
+def test_relocate_copy_failure_preserves_content(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    (source / "first.md").write_bytes(b"first list")
+    (source / "second.md").write_bytes(b"second list\r\n\xff")
+    original_copy = storage.shutil.copyfileobj
+
+    def fail_second_copy(incoming, outgoing):
+        if incoming.name.endswith("second.md"):
+            outgoing.write(incoming.read(3))
+            raise OSError("simulated copy failure")
+        original_copy(incoming, outgoing)
+
+    monkeypatch.setattr(storage.shutil, "copyfileobj", fail_second_copy)
+
+    with pytest.raises(OSError, match="simulated copy failure"):
+        relocate_lists(source, target, move=True)
+
+    assert (target / "first.md").read_bytes() == b"first list"
+    assert not (source / "first.md").exists()
+    assert (source / "second.md").read_bytes() == b"second list\r\n\xff"
+    assert not (target / "second.md").exists()
+
+
+def test_relocate_source_deletion_failure_preserves_both_copies(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    content = b"complete list\r\n\xff"
+    (source / "tasks.md").write_bytes(content)
+    original_unlink = storage.os.unlink
+
+    def fail_source_unlink(path, *args, **kwargs):
+        if path == str(source / "tasks.md"):
+            raise PermissionError("simulated deletion failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(storage.os, "unlink", fail_source_unlink)
+
+    with pytest.raises(PermissionError, match="simulated deletion failure"):
+        relocate_lists(source, target, move=True)
+
+    assert (source / "tasks.md").read_bytes() == content
+    assert (target / "tasks.md").read_bytes() == content
+
+
+def test_relocate_never_overwrites_target_created_after_validation(tmp_path, monkeypatch):
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    (source / "tasks.md").write_bytes(b"source list")
+
+    def create_collision(path, mode):
+        if mode == "xb":
+            (target / "tasks.md").write_bytes(b"concurrent list")
+        return builtins.open(path, mode)
+
+    monkeypatch.setattr(storage, "open", create_collision, raising=False)
+
+    with pytest.raises(FileExistsError):
+        relocate_lists(source, target, move=True)
+
+    assert (source / "tasks.md").read_bytes() == b"source list"
+    assert (target / "tasks.md").read_bytes() == b"concurrent list"
