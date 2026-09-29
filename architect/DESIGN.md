@@ -31,7 +31,7 @@ Paths below are relative to `implementer/src/`.
 - Controller switching uses the bound store directory as its source of truth and replaces both bindings only after success. Equivalent paths are no-ops; errors retain the original bindings. Settings persistence remains the caller's responsibility.
 - Settings schema and validation are canonical in `todo_md/settings.py`. A null lists directory means the application default; legacy theme-only files load compatibly. Configuration never moves with lists.
 - Startup resolves the lists directory from saved settings, creates it on demand, and supplies it to storage/controller. System theme is detected live, never persisted as a resolved choice.
-- Settings Save validates all controls, persists the complete payload, and reapplies theme/filter immediately. The saved lists directory currently takes effect at next startup. Settings-dialog Cancel changes nothing.
+- Settings Save validates theme/count before filesystem work, normalizes the directory, asks whether to move existing lists, and switches the controller before persisting the full payload. Relocation-popup Cancel retains the active directory while saving other edits; the settings-window Cancel discards unsaved controls. Theme/filter apply after persistence succeeds.
 
 ## External Interfaces
 
@@ -44,3 +44,4 @@ Paths below are relative to `implementer/src/`.
 ## Known Architectural Debt
 
 - Multi-file relocation is not transactional: earlier moves remain at the destination after a later failure; source-deletion failure leaves both copies. Callers must surface affected directories and avoid treating errors as a completed switch. Batch recovery and configuration persistence are not yet coordinated.
+- GUI directory state, sidebar, selection, and rows can diverge from the bound store after relocation or settings-save failure. Synchronize them with the active store, retain unapplied preferences, and support explicit persistence retry without repeating completed moves.
