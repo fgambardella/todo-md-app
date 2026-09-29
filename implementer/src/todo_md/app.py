@@ -646,18 +646,19 @@ class TodoApp:
         creatable directory, a completed-visible value that is not an
         int 0–999, or an unknown theme) shows a ``showerror`` messagebox
         and keeps the window open with nothing persisted. An empty
-        persisted as ``lists_dir: null``); an entry left at the pre-filled
-        default dir is normalized the same way (a resolved default path is
-        never persisted).
+        entry normalizes to ``lists_dir: null``; an entry left at the
+        pre-filled default dir is also normalized to None (never persisted).
+
+        If the lists folder changed and the active store contains Markdown
+        lists, a messagebox asks whether to move them (Yes), keep the old
+        (No), or cancel (Cancel). On Yes, ``change_lists_dir(move=True)``
+        runs; on No, only settings are persisted (source lists remain).
+        On Cancel, the window stays open and nothing persists.
 
         A valid Save writes the full payload via ``save_settings``,
         replaces the in-memory settings, then re-applies the theme
-        exactly like the theme toggle (``resolve_theme`` ->
-        ``_apply_theme`` -> ``_refresh_items``) so the palette and the
-        new completed-visible count take effect immediately (the row
-        refresh is display-only). The new lists folder itself takes
-        effect at the NEXT startup — no runtime relocation or sidebar
-        reload here.
+        and refreshes rows immediately. Future list/item operations
+        use the new directory.
         """
         from tkinter import messagebox  # lazy: keep module importable headless
 
@@ -689,20 +690,68 @@ class TodoApp:
             )
             return
 
+        # Normalize empty entry to None (means default dir).
+        new_lists_dir = (
+            dir_text
+            if dir_text and dir_text != DEFAULT_DATA_DIR
+            else None
+        )
+
+        # If the active directory changed, check for existing Markdown lists
+        # in the current store and prompt the user how to proceed.
+        old_dir = self.controller.store.data_dir
+        if new_lists_dir != old_dir:
+            if not self._directories_equivalent(old_dir, new_lists_dir):
+                # Count Markdown files in the active store.
+                import os
+                existing_markdown = [
+                    p for p in os.listdir(old_dir)
+                    if p.endswith(".md") and os.path.isfile(os.path.join(old_dir, p))
+                ]
+                if existing_markdown:
+                    # Prompt Yes/No/Cancel
+                    prompt = (
+                        f"You are about to change the directory where your lists are stored "
+                        f"from '{old_dir}' to '{new_lists_dir}' but there are already lists in it."
+                    )
+                    result = messagebox.askyesnocancel("Confirm directory change", prompt)
+                    if result is None:  # Cancel
+                        return
+                    move = result  # True = Yes, False = No
+                else:
+                    move = True  # No Markdown files, no prompt needed
+
+                # Attempt directory change if requested
+                if new_lists_dir:
+                    if move is not None:
+                        try:
+                            self.controller.change_lists_dir(new_lists_dir, move=move)
+                        except OSError as e:
+                            messagebox.showerror(
+                                "Directory change failed",
+                                f"Could not switch lists folder from '{old_dir}' to '{new_lists_dir}': "
+                                f"{e}\n\nSome files may already be at the destination. "
+                                "The directory preference is not saved for restart.",
+                            )
+                            return
+
         new_settings = Settings(
             theme=theme,
-            # Normalize "default" to None: the entry is pre-filled with the
-            # effective dir (settings.lists_dir or DEFAULT_DATA_DIR), and
-            # "Reset to default" sets it to DEFAULT_DATA_DIR — a resolved
-            # default path must not be persisted, mirroring the theme rule.
-            lists_dir=(
-                dir_text
-                if dir_text and dir_text != DEFAULT_DATA_DIR
-                else None
-            ),
+            lists_dir=new_lists_dir,
             completed_visible=completed,
         )
-        save_settings(self.config_dir, new_settings)
+
+        try:
+            save_settings(self.config_dir, new_settings)
+        except OSError as e:
+            messagebox.showerror(
+                "Settings save failed",
+                f"The directory preference could not be saved:\n{e}\n\n"
+                f"The lists folder will remain '{self.controller.store.data_dir}' "
+                "until the next restart.",
+            )
+            return
+
         self.settings = new_settings
 
         # Re-apply the theme exactly like the toggle button does, then
@@ -714,6 +763,16 @@ class TodoApp:
         self._refresh_items()
 
         self._close_settings()
+
+    def _directories_equivalent(self, a: str, b: str | None) -> bool:
+        """Whether two directory paths refer to the same location."""
+        import os
+        if b is None:
+            b = DEFAULT_DATA_DIR
+        try:
+            return os.path.samefile(a, b)
+        except FileNotFoundError:
+            return False
 
     def _close_settings(self) -> None:
         win = getattr(self, "settings_window", None)
