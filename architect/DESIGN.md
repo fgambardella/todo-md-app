@@ -22,6 +22,7 @@ Paths below are relative to `implementer/src/`.
 - **Assets**, `todo_md/assets/`: presentation icons and attribution in `LICENSE.txt`; dock-icon loading fails softly.
 - **Build and release**, `scripts/build_app.sh`, `scripts/release_package.sh`: dev-only PyInstaller bundling, Apple Silicon guard, icon conversion, launch smoke test, and versioned distributable ZIP. Artifacts remain gitignored.
 - **Version tooling**, `scripts/bump_version.sh`: optional installed Git hook increments and stages `todo_md/VERSION`.
+- **Verification harness**, `tests/conftest.py`: pytest fixtures intercept unexpected native dialogs and own only their created Tk roots. Bounded subprocess proofs in `tests/test_dialog_guard.py` and `tests/test_gui_lifecycle.py` verify error detection and cleanup without user input.
 
 ## Data Models and Flow
 
@@ -31,7 +32,8 @@ Paths below are relative to `implementer/src/`.
 - Controller switching uses the bound store directory as its source of truth and replaces both bindings only after success. Equivalent paths are no-ops; errors retain the original bindings. Settings persistence remains the caller's responsibility.
 - Settings schema and validation are canonical in `todo_md/settings.py`. A null lists directory means the application default; legacy theme-only files load compatibly. Configuration never moves with lists.
 - Startup resolves the lists directory from saved settings, creates it on demand, and supplies it to storage/controller. System theme is detected live, never persisted as a resolved choice.
-- Settings Save validates all controls, persists the complete payload, and reapplies theme/filter immediately. The saved lists directory currently takes effect at next startup. Settings-dialog Cancel changes nothing.
+- Settings Save validates theme/count before filesystem work, normalizes the directory, asks whether to move existing lists, and switches the controller before persisting the full payload. Relocation-popup Cancel retains the active directory while saving other edits; the settings-window Cancel discards unsaved controls. Theme/filter apply after persistence succeeds.
+- Runtime directory preferences and views follow the bound store, not necessarily the last saved JSON. Failed relocation refreshes the remaining source; unreadable views clear safely. Failed preference persistence retains an editable destination and the previous theme/filter, reports the unsaved restart preference, and permits retry without repeating completed moves.
 
 ## External Interfaces
 
@@ -43,4 +45,4 @@ Paths below are relative to `implementer/src/`.
 
 ## Known Architectural Debt
 
-- Multi-file relocation is not transactional: earlier moves remain at the destination after a later failure; source-deletion failure leaves both copies. Callers must surface affected directories and avoid treating errors as a completed switch. Batch recovery and configuration persistence are not yet coordinated.
+- List batches and configuration cannot commit atomically: earlier moves remain at the destination after a later failure, and source-deletion failure leaves both copies. Automatic batch resume/rollback is unavailable; recovery of files split across directories may require manual intervention.
