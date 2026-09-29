@@ -2,6 +2,7 @@
 
 import pytest
 
+from todo_md import app as app_module
 from todo_md.app import TodoController
 from todo_md.storage import MarkdownListStore
 
@@ -86,3 +87,179 @@ def test_data_dir_explicit_override_wins(tmp_path):
     controller = TodoController(store, data_dir=override)
     assert controller.data_dir == override
     assert controller.data_dir != store.data_dir
+
+
+def test_change_lists_dir_moves_contents_and_future_writes(controller, tmp_path):
+    source = controller.store.data_dir
+    target = tmp_path / "nested" / "lists"
+    contents = {
+        "work.md": b"# Custom heading\r\n- [ ] task one\r\n",
+        "other.md": b"# Other\n\nhandwritten notes without a final newline",
+    }
+    for name, content in contents.items():
+        (source / name).write_bytes(content)
+    (source / "notes.txt").write_bytes(b"leave here")
+
+    controller.change_lists_dir(target, move=True)
+
+    assert controller.data_dir == controller.store.data_dir == target
+    assert controller.list_names() == ["other", "work"]
+    for name, content in contents.items():
+        assert (target / name).read_bytes() == content
+        assert not (source / name).exists()
+    assert [(item.text, item.done) for item in controller.open_list("work").items] == [
+        ("task one", False)
+    ]
+
+    controller.toggle_item("work", 0)
+    controller.add_item("work", "task two")
+
+    assert (target / "work.md").read_bytes() == b"# work\n- [x] task one\n- [ ] task two\n"
+    assert (target / "other.md").read_bytes() == contents["other.md"]
+    assert {p.name: p.read_bytes() for p in source.iterdir()} == {"notes.txt": b"leave here"}
+
+
+def test_change_lists_dir_without_move_uses_empty_destination(controller, tmp_path):
+    source = controller.store.data_dir
+    original_store = controller.store
+    original = b"# work\r\n- [ ] old task\r\n"
+    (source / "work.md").write_bytes(original)
+    target = tmp_path / "nested" / "lists"
+
+    controller.change_lists_dir(str(target), move=False)
+
+    assert controller.data_dir == controller.store.data_dir == str(target)
+    assert original_store.data_dir == source
+    assert controller.list_names() == []
+    controller.create_list("work")
+    controller.add_item("work", "new task")
+
+    assert (source / "work.md").read_bytes() == original
+    assert (target / "work.md").read_bytes() == b"# work\n- [ ] new task\n"
+    assert controller.list_names() == ["work"]
+
+
+@pytest.mark.parametrize("move", [True, False])
+def test_change_lists_dir_populated_target_keeps_bindings(controller, tmp_path, move):
+    original_store = controller.store
+    original_dir = controller.data_dir
+    original = b"# work\r\n- [ ] source task\r\n"
+    (original_dir / "work.md").write_bytes(original)
+    target = tmp_path / "target"
+    target.mkdir()
+    existing = b"# Existing\r\n- [x] target task\r\n"
+    (target / "existing.md").write_bytes(existing)
+
+    with pytest.raises(FileExistsError, match="destination already contains Markdown"):
+        controller.change_lists_dir(target, move=move)
+
+    assert controller.store is original_store
+    assert controller.data_dir == controller.store.data_dir == original_dir
+    assert controller.list_names() == ["work"]
+    assert {p.name: p.read_bytes() for p in original_dir.iterdir()} == {"work.md": original}
+    assert {p.name: p.read_bytes() for p in target.iterdir()} == {"existing.md": existing}
+
+
+@pytest.mark.parametrize("move", [True, False])
+@pytest.mark.parametrize("invalid_kind", ["file", "file_parent", "empty"])
+def test_change_lists_dir_invalid_path_keeps_bindings(
+    controller, tmp_path, move, invalid_kind
+):
+    original_store = controller.store
+    original_dir = controller.data_dir
+    original = b"# work\n- [ ] task\n"
+    (original_dir / "work.md").write_bytes(original)
+    blocker = tmp_path / "not_a_directory"
+    blocker.write_bytes(b"not a directory")
+    targets = {"file": blocker, "file_parent": blocker / "lists", "empty": ""}
+
+    with pytest.raises(OSError):
+        controller.change_lists_dir(targets[invalid_kind], move=move)
+
+    assert controller.store is original_store
+    assert controller.data_dir == controller.store.data_dir == original_dir
+    assert (original_dir / "work.md").read_bytes() == original
+    assert blocker.read_bytes() == b"not a directory"
+
+
+@pytest.mark.parametrize("move", [True, False])
+def test_change_lists_dir_relocation_error_keeps_bindings(tmp_path, monkeypatch, move):
+    store = MarkdownListStore(tmp_path / "source")
+    override = str(tmp_path / "override")
+    controller = TodoController(store, data_dir=override)
+    controller.create_list("work")
+    original = (store.data_dir / "work.md").read_bytes()
+    target = tmp_path / "target"
+    failure = OSError("injected relocation failure")
+
+    def fail_relocation(old_dir, new_dir, should_move):
+        assert old_dir == store.data_dir
+        assert new_dir == target
+        assert should_move is move
+        raise failure
+
+    monkeypatch.setattr(app_module, "relocate_lists", fail_relocation)
+
+    with pytest.raises(OSError, match="injected relocation failure") as exc:
+        controller.change_lists_dir(target, move=move)
+
+    assert exc.value is failure
+    assert controller.store is store
+    assert controller.store.data_dir == tmp_path / "source"
+    assert controller.data_dir == override
+    assert (store.data_dir / "work.md").read_bytes() == original
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("move", [True, False])
+@pytest.mark.parametrize("path_kind", ["same", "normalized", "relative", "symlink"])
+def test_change_lists_dir_equivalent_path_is_noop(tmp_path, monkeypatch, move, path_kind):
+    source = tmp_path / "data"
+    store = MarkdownListStore(source)
+    override = str(tmp_path / "override")
+    controller = TodoController(store, data_dir=override)
+    original = b"# work\r\n- [ ] unchanged\r\n"
+    (source / "work.md").write_bytes(original)
+    if path_kind == "same":
+        target = source
+    elif path_kind == "normalized":
+        target = str(source / ".." / "data") + "/."
+    elif path_kind == "relative":
+        monkeypatch.chdir(tmp_path)
+        target = "data"
+    else:
+        target = tmp_path / "alias"
+        target.symlink_to(source, target_is_directory=True)
+
+    def unexpected_relocation(*args, **kwargs):
+        pytest.fail("same-directory requests must not call relocation")
+
+    monkeypatch.setattr(app_module, "relocate_lists", unexpected_relocation)
+
+    controller.change_lists_dir(target, move=move)
+
+    assert controller.store is store
+    assert controller.store.data_dir == source
+    assert controller.data_dir == override
+    assert controller.list_names() == ["work"]
+    assert (source / "work.md").read_bytes() == original
+
+
+def test_change_lists_dir_uses_store_not_constructor_override(tmp_path):
+    source = tmp_path / "source"
+    store = MarkdownListStore(source)
+    override = tmp_path / "override"
+    override.mkdir()
+    (override / "unrelated.md").write_bytes(b"not the active store")
+    controller = TodoController(store, data_dir=str(override))
+    original = b"# work\r\n- [ ] actual source\r\n"
+    (source / "work.md").write_bytes(original)
+    target = tmp_path / "target"
+
+    controller.change_lists_dir(target, move=True)
+
+    assert controller.data_dir == controller.store.data_dir == target
+    assert controller.list_names() == ["work"]
+    assert (target / "work.md").read_bytes() == original
+    assert list(source.iterdir()) == []
+    assert (override / "unrelated.md").read_bytes() == b"not the active store"
