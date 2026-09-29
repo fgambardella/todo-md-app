@@ -13,6 +13,7 @@ from .models import TodoItem, TodoList
 from .storage import MarkdownListStore
 from .settings import (
     Settings,
+    VALID_THEMES,
     load_settings,
     resolve_theme,
     save_settings,  # headless module (stdlib only)
@@ -92,6 +93,23 @@ def visible_items(
             continue
         result.append(item)
     return result
+
+
+def _valid_lists_dir_path(path: str) -> bool:
+    """Whether ``path`` is an existing dir or can be created (makedirs).
+
+    A path that exists but is not a directory (e.g. a plain file), or
+    whose parent exists but is not a directory, can never become the
+    lists folder and is rejected.
+    """
+    if os.path.isdir(path):
+        return True
+    if os.path.exists(path):
+        return False
+    parent = os.path.dirname(os.path.abspath(path))
+    if os.path.exists(parent) and not os.path.isdir(parent):
+        return False
+    return True
 
 
 class TodoController:
@@ -508,9 +526,10 @@ class TodoApp:
         The window is pre-filled from the in-memory ``self.settings``
         (effective lists dir = ``settings.lists_dir`` or the app default)
         and every control is bound to a small state holder on ``self``
-        (StringVar/IntVar) so a later Save handler can read the edited
-        values in one place. Save/Cancel are trivial close-only stubs in
-        this task — nothing is written to disk.
+        (StringVar/IntVar) so the Save handler can read the edited
+        values in one place. Save validates and applies (see
+        ``_settings_on_save``); Cancel is a full no-op that only closes
+        the window.
         """
         import tkinter as tk
         from tkinter import ttk
@@ -578,8 +597,7 @@ class TodoApp:
         )
         self._settings_spinbox.pack(side=tk.LEFT, padx=(8, 0))
 
-        # (d) Save / Cancel (stubs: close only — apply-on-Save is a later
-        # micro-task, so this window never writes settings on its own). ---
+        # (d) Save / Cancel ----------------------------------------------
         bottom = ttk.Frame(win, padding=(10, 8))
         bottom.pack(fill=tk.X, side=tk.BOTTOM)
         self._settings_save_btn = ttk.Button(
@@ -603,7 +621,79 @@ class TodoApp:
             var.set(path)
 
     def _settings_on_save(self) -> None:
-        """Save stub for this task: closes the window, writes nothing."""
+        """Validate, persist, and live-apply the edited settings; close.
+
+        Invalid input (a lists folder that is not an existing or
+        creatable directory, a completed-visible value that is not an
+        int 0–999, or an unknown theme) shows a ``showerror`` messagebox
+        and keeps the window open with nothing persisted. An empty
+        persisted as ``lists_dir: null``); an entry left at the pre-filled
+        default dir is normalized the same way (a resolved default path is
+        never persisted).
+
+        A valid Save writes the full payload via ``save_settings``,
+        replaces the in-memory settings, then re-applies the theme
+        exactly like the theme toggle (``resolve_theme`` ->
+        ``_apply_theme`` -> ``_refresh_items``) so the palette and the
+        new completed-visible count take effect immediately (the row
+        refresh is display-only). The new lists folder itself takes
+        effect at the NEXT startup — no runtime relocation or sidebar
+        reload here.
+        """
+        from tkinter import messagebox  # lazy: keep module importable headless
+
+        dir_text = self._settings_lists_dir_var.get().strip()
+        theme = self._settings_theme_var.get()
+        try:
+            completed = int(self._settings_spinbox.get().strip())
+        except ValueError:
+            completed = None
+        if completed is not None and not 0 <= completed <= 999:
+            completed = None
+
+        if dir_text and not _valid_lists_dir_path(dir_text):
+            messagebox.showerror(
+                "Settings",
+                "The lists folder is not an existing directory and cannot\n"
+                f"be created:\n{dir_text}",
+            )
+            return
+        if completed is None:
+            messagebox.showerror(
+                "Settings",
+                "Completed items visible must be a whole number between 0 and 999.",
+            )
+            return
+        if theme not in VALID_THEMES:
+            messagebox.showerror(
+                "Settings", f"Unknown theme: {theme!r}."
+            )
+            return
+
+        new_settings = Settings(
+            theme=theme,
+            # Normalize "default" to None: the entry is pre-filled with the
+            # effective dir (settings.lists_dir or DEFAULT_DATA_DIR), and
+            # "Reset to default" sets it to DEFAULT_DATA_DIR — a resolved
+            # default path must not be persisted, mirroring the theme rule.
+            lists_dir=(
+                dir_text
+                if dir_text and dir_text != DEFAULT_DATA_DIR
+                else None
+            ),
+            completed_visible=completed,
+        )
+        save_settings(self.config_dir, new_settings)
+        self.settings = new_settings
+
+        # Re-apply the theme exactly like the toggle button does, then
+        # refresh the current rows so the re-applied palette and the new
+        # completed-visible count take effect immediately.
+        self.theme = resolve_theme(new_settings)
+        self._apply_theme(self.theme)
+        self._theme_btn.config(text=self._theme_button_text())
+        self._refresh_items()
+
         self._close_settings()
 
     def _close_settings(self) -> None:

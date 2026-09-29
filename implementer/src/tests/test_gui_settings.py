@@ -1,12 +1,15 @@
-"""GUI tests: Settings button opens a pre-filled Toplevel settings window.
+"""GUI tests: settings window apply-on-Save + full-no-op Cancel.
 
-Covers the construction + pre-fill + wiring scope of task-35a: the button
-exists on the main window, the Toplevel opens and closes cleanly, every
-control group is present and pre-filled from the current in-memory
-settings, and nothing is written to disk (Save/Cancel are stubs here).
+Covers the task-35b scope on top of the 35a construction + pre-fill
+tests: a valid Save persists the full payload (theme / lists dir /
+completed-visible) and re-applies theme + completed filter live, an
+invalid Save is blocked with a clear error (window stays open, nothing
+persisted), an empty folder entry resets to the default dir, and
+Cancel is a full no-op that only closes the window.
 """
 
 import json
+from unittest.mock import patch
 
 from todo_md.app import DEFAULT_DATA_DIR, TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
@@ -171,9 +174,9 @@ def test_settings_reset_to_default(tmp_path):
         _teardown(app)
 
 
-def test_settings_opening_and_save_write_nothing(tmp_path):
-    """This task must not write settings: open, edit, Save -> no disk write,
-    and the in-memory settings stay untouched."""
+def test_save_theme_persists_full_payload_and_reapplies(tmp_path):
+    """Valid Save with a changed theme persists settings.json and re-applies
+    the palette live (like the theme toggle)."""
     config_dir = tmp_path / "config"
     app = _build_app(tmp_path)
     try:
@@ -182,16 +185,157 @@ def test_settings_opening_and_save_write_nothing(tmp_path):
 
         app._open_settings()
         app.root.update()
-        app._settings_lists_dir_var.set(str(tmp_path / "newdir"))
-        app._settings_theme_var.set("light")
-        app._settings_completed_var.set(3)
-
+        app._settings_theme_var.set("dark")
         app._settings_save_btn.invoke()
+        app.root.update()
+
+        data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
+        assert data == {"theme": "dark", "lists_dir": None, "completed_visible": 10}
+        assert app.settings.theme == "dark"
+        assert app.theme == "dark"
+        # Palette re-applied live (fallback clam path on this machine).
+        assert app._palette is not None
+        assert app._palette["bg"] == "#1e1e1e"
+        assert app._theme_btn.cget("text") == "☀️ Light"
+        # Window closed after a successful Save.
+        assert app.settings_window is None
+    finally:
+        _teardown(app)
+
+
+def _seed_items(app, items) -> None:
+    """Write items (text, done) into list 'L' and select it in the GUI."""
+    app.controller.store.save("L", items)
+    app.refresh_lists(select_first=True)
+
+
+def test_save_completed_visible_persists_and_filters(tmp_path):
+    """A changed completed_visible is persisted and the view hides completed
+    items beyond the count live (0 hides all)."""
+    config_dir = tmp_path / "config"
+    app = _build_app(tmp_path)  # default completed_visible = 10
+    items = [
+        ("a", False), ("b", False),
+        ("c", True), ("d", True), ("e", True), ("f", True),
+    ]
+    _seed_items(app, items)
+    try:
+        app.root.update()
+        assert len(app._item_rows) == 6  # all visible under the default count
+
+        # Save with completed_visible = 1: only 1 of the 4 completed stays.
+        app._open_settings()
+        app.root.update()
+        app._settings_completed_var.set(1)
+        app._settings_save_btn.invoke()
+        app.root.update()
+
+        data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
+        assert data["completed_visible"] == 1
+        assert app.settings.completed_visible == 1
+        assert len(app._item_rows) == 3  # 2 incomplete + 1 completed
+
+        # Save with completed_visible = 0: all completed hidden.
+        app._open_settings()
+        app.root.update()
+        app._settings_completed_var.set(0)
+        app._settings_save_btn.invoke()
+        app.root.update()
+
+        data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
+        assert data["completed_visible"] == 0
+        assert app.settings.completed_visible == 0
+        assert len(app._item_rows) == 2  # only the incomplete items
+
+        # Storage itself is untouched (display-only filter).
+        assert app.controller.store.load("L") == items
+        assert app.settings_window is None
+    finally:
+        _teardown(app)
+
+
+def test_save_invalid_dir_shows_error_keeps_open_persists_nothing(tmp_path):
+    """A lists folder that is not an existing dir and cannot be created
+    (parent is a file) is blocked: showerror is called, the window stays
+    open, and nothing is written to disk."""
+    config_dir = tmp_path / "config"
+    app = _build_app(tmp_path)
+    blocker = tmp_path / "blocker"
+    blocker.write_text("i am a file, not a directory", encoding="utf-8")
+    invalid = str(blocker / "sub")
+    try:
+        app.root.update()
+
+        app._open_settings()
+        app.root.update()
+        app._settings_lists_dir_var.set(invalid)
+
+        with patch("tkinter.messagebox.showerror") as err:
+            app._settings_save_btn.invoke()
+            app.root.update()
+
+        assert err.called
+        args = err.call_args.args
+        assert any(invalid in str(a) for a in args)
+        # Window stays open on a failed Save.
+        assert app.settings_window is not None
+        assert app.settings_window.winfo_exists()
+        # Nothing persisted; in-memory settings untouched.
+        assert not (config_dir / "settings.json").exists()
+        assert app.settings.theme == "system"
+        assert app.settings.lists_dir is None
+        assert app.settings.completed_visible == 10
+    finally:
+        _teardown(app)
+
+
+def test_save_empty_dir_entry_persists_default_and_closes(tmp_path):
+    """An empty folder entry means "reset to default": settings.json is
+    written with lists_dir null and the window closes."""
+    config_dir = tmp_path / "config"
+    app = _build_app(tmp_path)
+    try:
+        app.root.update()
+
+        app._open_settings()
+        app.root.update()
+        # Simulate the user clearing the entry (equivalent to a cleared
+        # bound Entry widget).
+        app._settings_lists_dir_var.set("")
+        app._settings_save_btn.invoke()
+        app.root.update()
+
+        data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
+        assert data == {"theme": "system", "lists_dir": None, "completed_visible": 10}
+        assert app.settings.lists_dir is None
+        # Window closed after a successful Save.
+        assert app.settings_window is None
+    finally:
+        _teardown(app)
+
+
+def test_cancel_edits_are_a_full_noop(tmp_path):
+    """Cancel after editing every control: nothing on disk, in-memory
+    settings unchanged, window closed."""
+    config_dir = tmp_path / "config"
+    app = _build_app(tmp_path)
+    try:
+        app.root.update()
+        app._open_settings()
+        app.root.update()
+
+        app._settings_lists_dir_var.set(str(tmp_path / "editeddir"))
+        app._settings_theme_var.set("dark")
+        app._settings_completed_var.set(3)
+        app._settings_cancel_btn.invoke()
         app.root.update()
 
         assert not (config_dir / "settings.json").exists()
         assert app.settings.theme == "system"
         assert app.settings.lists_dir is None
         assert app.settings.completed_visible == 10
+        assert app.settings_window is None
+        # Only the settings window closed — the main window is still up.
+        assert app.root.winfo_exists()
     finally:
         _teardown(app)
