@@ -112,6 +112,32 @@ def _valid_lists_dir_path(path: str) -> bool:
     return True
 
 
+def _normalize_dir(path: str) -> str:
+    """Stable absolute form of a user-entered directory path (no symlink resolution)."""
+    return os.path.abspath(os.path.expanduser(path))
+
+
+def _same_dir(a: str, b: str) -> bool:
+    """Whether two directories are the same location (symlinks included).
+
+    A missing side (including a path below a non-directory) falls back to
+    comparing normalized paths; other filesystem errors propagate.
+    """
+    try:
+        return os.path.samefile(a, b)
+    except (FileNotFoundError, NotADirectoryError):
+        return _normalize_dir(a) == _normalize_dir(b)
+
+
+def _has_markdown(directory: str) -> bool:
+    """Whether ``directory`` holds top-level Markdown files; missing means no."""
+    try:
+        with os.scandir(directory) as entries:
+            return any(e.name.endswith(".md") and e.is_file() for e in entries)
+    except FileNotFoundError:
+        return False
+
+
 class TodoController:
     """Mediates between the user (or UI) and the MarkdownListStore.
 
@@ -640,29 +666,32 @@ class TodoApp:
             var.set(path)
 
     def _settings_on_save(self) -> None:
-        """Validate, persist, and live-apply the edited settings; close.
+        """Validate, apply the directory decision, persist, and live-apply; close.
 
-        Invalid input (a lists folder that is not an existing or
-        creatable directory, a completed-visible value that is not an
-        int 0–999, or an unknown theme) shows a ``showerror`` messagebox
-        and keeps the window open with nothing persisted. An empty
-        entry normalizes to ``lists_dir: null``; an entry left at the
-        pre-filled default dir is also normalized to None (never persisted).
+        Theme and completed-visible (int 0-999) are validated first, before
+        any filesystem check, prompt, creation, relocation, or persistence;
+        invalid input shows ``showerror`` and keeps the window open. A blank
+        entry means the actual ``DEFAULT_DATA_DIR``. Paths are normalized to
+        absolute form and compared with ``controller.store.data_dir``; an
+        equivalent path (including via symlinks) neither prompts nor relocates.
+        The effective default directory is always persisted as ``lists_dir:
+        null``.
 
-        If the lists folder changed and the active store contains Markdown
-        lists, a messagebox asks whether to move them (Yes), keep the old
-        (No), or cancel (Cancel). On Yes, ``change_lists_dir(move=True)``
-        runs; on No, only settings are persisted (source lists remain).
-        On Cancel, the window stays open and nothing persists.
+        For a changed target whose active directory holds Markdown lists, a
+        Yes/No/Cancel prompt asks whether to move them (Yes), switch without
+        moving (No), or keep the active directory (Cancel, which still
+        persists the other valid settings and never inspects or creates the
+        abandoned target). Empty, missing, or non-Markdown-only sources need
+        no prompt. The chosen target is validated only after the decision and
+        applied through ``controller.change_lists_dir``. Filesystem errors are
+        reported, never raised into Tk. Batch rollback and persistence-failure
+        recovery are not handled here.
 
-        A valid Save writes the full payload via ``save_settings``,
-        replaces the in-memory settings, then re-applies the theme
-        and refreshes rows immediately. Future list/item operations
-        use the new directory.
+        A valid Save writes the full payload via ``save_settings``, replaces
+        the in-memory settings, then re-applies the theme and refreshes rows.
         """
         from tkinter import messagebox  # lazy: keep module importable headless
 
-        dir_text = self._settings_lists_dir_var.get().strip()
         theme = self._settings_theme_var.get()
         try:
             completed = int(self._settings_spinbox.get().strip())
@@ -671,13 +700,6 @@ class TodoApp:
         if completed is not None and not 0 <= completed <= 999:
             completed = None
 
-        if dir_text and not _valid_lists_dir_path(dir_text):
-            messagebox.showerror(
-                "Settings",
-                "The lists folder is not an existing directory and cannot\n"
-                f"be created:\n{dir_text}",
-            )
-            return
         if completed is None:
             messagebox.showerror(
                 "Settings",
@@ -690,57 +712,17 @@ class TodoApp:
             )
             return
 
-        # Normalize empty entry to None (means default dir).
-        new_lists_dir = (
-            dir_text
-            if dir_text and dir_text != DEFAULT_DATA_DIR
-            else None
-        )
-
-        # Resolve the effective target directory for comparison.
-        # None means DEFAULT_DATA_DIR; convert to string for path comparison.
-        effective_new_dir = new_lists_dir if new_lists_dir is not None else DEFAULT_DATA_DIR
-        old_dir = str(self.controller.store.data_dir)
-
-        # If the active directory changed, check for existing Markdown lists
-        # in the current store and prompt the user how to proceed.
-        if effective_new_dir != old_dir:
-            if not self._directories_equivalent(old_dir, effective_new_dir):
-                # Count Markdown files in the active store.
-                import os
-                existing_markdown = [
-                    p for p in os.listdir(old_dir)
-                    if p.endswith(".md") and os.path.isfile(os.path.join(old_dir, p))
-                ]
-                if existing_markdown:
-                    # Prompt Yes/No/Cancel
-                    prompt = (
-                        f"You are about to change the directory where your lists are stored "
-                        f"from '{old_dir}' to '{effective_new_dir}' but there are already lists in it."
-                    )
-                    result = messagebox.askyesnocancel("Confirm directory change", prompt)
-                    if result is None:  # Cancel
-                        # Keep old directory but persist other valid settings.
-                        new_lists_dir = old_dir
-                        effective_new_dir = old_dir
-                        move = None
-                    else:
-                        move = result  # True = Yes, False = No
-                else:
-                    move = True  # No Markdown files, no prompt needed
-
-                # Attempt directory change if requested and not cancelled.
-                if move is not None and effective_new_dir != old_dir:
-                    try:
-                        self.controller.change_lists_dir(effective_new_dir, move=move)
-                    except OSError as e:
-                        messagebox.showerror(
-                            "Directory change failed",
-                            f"Could not switch lists folder from '{old_dir}' to '{effective_new_dir}': "
-                            f"{e}\n\nSome files may already be at the destination. "
-                            "The directory preference is not saved for restart.",
-                        )
-                        return
+        try:
+            proceed, new_lists_dir = self._decide_lists_dir(
+                messagebox, self._settings_lists_dir_var.get()
+            )
+        except OSError as e:
+            messagebox.showerror(
+                "Settings", f"Could not inspect the lists folders:\n{e}"
+            )
+            return
+        if not proceed:
+            return
 
         new_settings = Settings(
             theme=theme,
@@ -771,15 +753,55 @@ class TodoApp:
 
         self._close_settings()
 
-    def _directories_equivalent(self, a: str, b: str | None) -> bool:
-        """Whether two directory paths refer to the same location."""
-        import os
-        if b is None:
-            b = DEFAULT_DATA_DIR
+    def _decide_lists_dir(self, messagebox, entry_text: str) -> tuple[bool, str | None]:
+        """Resolve the entry into ``(proceed, lists_dir_setting)``.
+
+        ``proceed`` is False when an error was already reported (nothing
+        persisted). ``lists_dir_setting`` is None for the effective default.
+        Raises OSError for directory inspection/equivalence failures.
+        """
+        target = _normalize_dir(entry_text.strip() or DEFAULT_DATA_DIR)
+        old_dir = str(self.controller.store.data_dir)
+
+        if _same_dir(old_dir, target):
+            return True, self._lists_dir_setting(target)
+
+        move = True
+        if _has_markdown(old_dir):
+            prompt = (
+                "You are about to change the directory where your lists are stored "
+                f"from '{old_dir}' to '{target}' but there are already lists in it."
+            )
+            answer = messagebox.askyesnocancel("Confirm directory change", prompt)
+            if answer is None:  # Cancel: keep active directory, abandon target.
+                return True, self._lists_dir_setting(_normalize_dir(old_dir))
+            move = answer
+
+        if not _valid_lists_dir_path(target):
+            messagebox.showerror(
+                "Settings",
+                "The lists folder is not an existing directory and cannot\n"
+                f"be created:\n{target}",
+            )
+            return False, None
         try:
-            return os.path.samefile(a, b)
-        except FileNotFoundError:
-            return False
+            self.controller.change_lists_dir(target, move=move)
+        except OSError as e:
+            messagebox.showerror(
+                "Directory change failed",
+                f"Could not switch lists folder from '{old_dir}' to '{target}': "
+                f"{e}\n\nSome files may already be at the destination. "
+                "The directory preference is not saved for restart.",
+            )
+            return False, None
+        return True, self._lists_dir_setting(target)
+
+    @staticmethod
+    def _lists_dir_setting(path: str) -> str | None:
+        """Persisted form of an effective directory: None for the default."""
+        if _same_dir(path, _normalize_dir(DEFAULT_DATA_DIR)):
+            return None
+        return path
 
     def _close_settings(self) -> None:
         win = getattr(self, "settings_window", None)
