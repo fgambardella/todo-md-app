@@ -31,7 +31,17 @@ None.
 
 ## Queue
 
-None.
+- Functional change request: now it is forbidden to the user to select a non empty destination directory for lists. The user receives the following message:
+"Could not switch lists folder from '...' to '...': destination already contains Markdown files: ...". I want that the user can select a not empty destination directory and, if it decide to proceed copying list files from the source directory, the operation fails only if in the destination directory there is already a file with the same name of a file in the source directory. No file overwrite permitted.
+Some files may already be at the destination. Completed moves have not been undone. The active lists folder is '/Users/flavio/.todo-md-app/lists'. The directory preference is not saved for restart.
+- GUI BUG: when the app main window opens, the setting button is partially hidden.
+- GUI BUG: when the setting window opens, the cancel/save buttons are partially hidden.
+- GUI BUG: in the setting window, the cancel/save buttons must be orizzontally centered.
+- GUI BUG: in the setting window the "theme" section has a too bright background in dark mode and too tanned background in light mode.
+- GUI BUG: in the setting window the "theme" section lacks of left and right margin.
+- GUI BUG: in the setting window the confirmation message: "You are about to change the directory where your lists are stored from '...' to '...' but there are already lists in it." misses a foundamental final part: the question! It should be: "You are about to change the directory where your lists are stored from '...' to '...' but there are already lists in it. Do you want to copy them in the new path?"
+- GUI BUG: in the todolist, the completed list items must be always shown on top, in order of completion (from least recently completed on the very top and the last recently completed just before the first uncompleted one). Only the least recently completed list item must be hidden when a list item is completed.
+- GUI BUG: in light mode, the cursor disappear in all input fields (probably white over white).
 
 ## Active Blockers
 

@@ -56,7 +56,7 @@ You exclusively own `DESIGN.md` in this directory. If `DESIGN.md` does not exist
 Any later instruction to "update `DESIGN.md`" means applying this evaluate, revise, deduplicate, prune, and budget-check process—not appending a historical entry.
 
 ### Delegation
-Launch the child Implementer agent from its sibling workspace with `cd ../implementer && kilo --agent code --prompt "[PROMPT FROM TASKS.md]"`. Set the Bash tool call's timeout parameter to 1,200 seconds and wait for the child process to finish.
+Launch the child Implementer agent from its sibling workspace with `cd ../implementer && pi -p "[PROMPT FROM TASKS.md]"`. Set the Bash tool call's timeout parameter to 1,200 seconds and wait for the child process to finish.
 The prompt for the delegated Implementer agent MUST:
   - State the exact assigned implementation branch and identify `main` as its base and integration branch.
   - Restrict changes to delegated files under `../implementer/` and forbid changes anywhere under `../architect/` or at the repository root.
