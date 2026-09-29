@@ -1,6 +1,62 @@
 """Shared test infrastructure for GUI tests."""
 
+from contextlib import contextmanager
+from pathlib import Path
+
 import pytest
+
+pytest_plugins = ["pytester"]
+
+
+@contextmanager
+def managed_tk_roots():
+    """Own only roots created here, draining each before unconditional destroy."""
+    from tkinter import Tk
+
+    roots = []
+    errors = []
+
+    def create(*args, **kwargs):
+        root = Tk(*args, **kwargs)
+        roots.append(root)
+        return root
+
+    try:
+        yield create
+    except BaseException as error:
+        errors.append(error)
+    finally:
+        for root in reversed(roots):
+            try:
+                root.update()
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                try:
+                    root.destroy()
+                except BaseException as error:
+                    errors.append(error)
+        if len(errors) == 1:
+            raise errors[0]
+        if errors:
+            raise BaseExceptionGroup("Tk root lifecycle failures", errors)
+
+
+@pytest.fixture
+def isolated_pytest(pytester):
+    """Run the real shared fixtures in a bounded, separate pytest process."""
+    source_dir = str(Path(__file__).resolve().parents[1])
+    pytester.makeconftest(
+        f"import sys\nsys.path.insert(0, {source_dir!r})\n"
+        "from tests.conftest import dialog_guard\n"
+    )
+
+    def run(source):
+        pytester.makepyfile(test_isolated=source)
+        # TimeoutExpired propagates: a hung native dialog is never a pass.
+        return pytester.runpytest_subprocess("-v", "--tb=short", timeout=30)
+
+    return run
 
 
 class UnexpectedDialogError(AssertionError):

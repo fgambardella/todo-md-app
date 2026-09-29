@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
+from tests.conftest import managed_tk_roots
 from todo_md.app import TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
 
@@ -59,15 +60,8 @@ def make_app(tmp_path, default_dir):
             )
         store_dir = data_dir or (settings or {}).get("lists_dir") or default_dir
         controller = TodoController(MarkdownListStore(store_dir))
-        try:
+        with patch("tkinter.Tk", create_root):
             app = TodoApp(controller, data_dir=app_data_dir, config_dir=str(config_dir))
-        except BaseException:
-            import tkinter
-
-            root = getattr(tkinter, "_default_root", None)
-            if root is not None:
-                root.destroy()
-            raise
         app.callback_errors = []
         app.root.report_callback_exception = (
             lambda exc, val, tb: app.callback_errors.append(val)
@@ -76,15 +70,10 @@ def make_app(tmp_path, default_dir):
         app.root.update()
         return app
 
-    yield build
+    with managed_tk_roots() as create_root:
+        yield build
 
-    errors = []
-    for app in apps:
-        try:
-            app.root.update()
-        finally:
-            app.root.destroy()
-        errors.extend(app.callback_errors)
+    errors = [error for app in apps for error in app.callback_errors]
     assert errors == [], f"uncaught Tk callback errors: {errors!r}"
 
 
