@@ -32,6 +32,7 @@ Paths below are relative to `implementer/src/`.
 - Settings schema and validation are canonical in `todo_md/settings.py`. A null lists directory means the application default; legacy theme-only files load compatibly. Configuration never moves with lists.
 - Startup resolves the lists directory from saved settings, creates it on demand, and supplies it to storage/controller. System theme is detected live, never persisted as a resolved choice.
 - Settings Save validates theme/count before filesystem work, normalizes the directory, asks whether to move existing lists, and switches the controller before persisting the full payload. Relocation-popup Cancel retains the active directory while saving other edits; the settings-window Cancel discards unsaved controls. Theme/filter apply after persistence succeeds.
+- Runtime directory preferences and views follow the bound store, not necessarily the last saved JSON. Failed relocation refreshes the remaining source; unreadable views clear safely. Failed preference persistence retains an editable destination and the previous theme/filter, reports the unsaved restart preference, and permits retry without repeating completed moves.
 
 ## External Interfaces
 
@@ -43,5 +44,4 @@ Paths below are relative to `implementer/src/`.
 
 ## Known Architectural Debt
 
-- Multi-file relocation is not transactional: earlier moves remain at the destination after a later failure; source-deletion failure leaves both copies. Callers must surface affected directories and avoid treating errors as a completed switch. Batch recovery and configuration persistence are not yet coordinated.
-- GUI directory state, sidebar, selection, and rows can diverge from the bound store after relocation or settings-save failure. Synchronize them with the active store, retain unapplied preferences, and support explicit persistence retry without repeating completed moves.
+- List batches and configuration cannot commit atomically: earlier moves remain at the destination after a later failure, and source-deletion failure leaves both copies. Automatic batch resume/rollback is unavailable; recovery of files split across directories may require manual intervention.
