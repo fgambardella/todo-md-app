@@ -22,6 +22,7 @@ Paths below are relative to `implementer/src/`.
 - **Assets**, `todo_md/assets/`: presentation icons and attribution in `LICENSE.txt`; dock-icon loading fails softly.
 - **Build and release**, `scripts/build_app.sh`, `scripts/release_package.sh`: dev-only PyInstaller bundling, Apple Silicon guard, icon conversion, launch smoke test, and versioned distributable ZIP. Artifacts remain gitignored.
 - **Version tooling**, `scripts/bump_version.sh`: optional installed Git hook increments and stages `todo_md/VERSION`.
+- **Verification harness**, `tests/conftest.py`: pytest fixtures intercept unexpected native dialogs and own only their created Tk roots. Bounded subprocess proofs in `tests/test_dialog_guard.py` and `tests/test_gui_lifecycle.py` verify error detection and cleanup without user input.
 
 ## Data Models and Flow
 
