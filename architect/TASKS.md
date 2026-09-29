@@ -12,6 +12,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - Tests require `implementer/src/` as working directory for existing relative asset paths; tools may set that workdir directly and run the inner command.
 - Build/release changes also require the corresponding gated tests from `implementer/src/`: `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v`; `RUN_RELEASE_TESTS=1 .venv/bin/python -m pytest tests/test_release_package.py -v`.
 - GUI tests run on the local display, use isolated temporary data/config directories, and update Tk roots before destroying them in `finally`. Headless tests never launch the GUI.
+- Automated tests must never require human input: mock expected dialog choices explicitly; unexpected messageboxes/file pickers must fail immediately, including errors swallowed by Tk callbacks. Never blanket-answer Yes or hide failures with skips/xfails.
 
 ## Current Implementation Summary
 
@@ -26,46 +27,47 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-**36b2: GUI lists-directory relocation (S, final micro-task of 36b-M).**
+**36b2: GUI relocation recovery (M); current micro-task R1: unattended test harness (S).**
 
-- Size rationale: localized settings Save integration using the verified controller operation; no new relocation algorithm, persistence format, or rollback mechanism.
-- Branch: `implementer/task-36b2-settings-relocation`; base and integration: `main`.
-- Status: prepared for user-interactive delegation; no child process running.
-- Scope: settings-related GUI code in `implementer/src/todo_md/app.py` and `implementer/src/tests/test_gui_settings.py`; normal VERSION hook update allowed.
-- Acceptance: the prompt/validation/save flow below supports Yes, No, Cancel, empty/default/equivalent directories, immediate store/UI consistency, and explicit safe failure handling. Existing behavior outside directory changes remains intact.
-- Required tests: confirmation choices and exact text; empty-source no-popup; populated/invalid target; invalid completed count before effects; default/equivalent paths; subsequent writes, repeat Save, relocation and settings-persistence errors.
-- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_controller.py tests/test_storage.py tests/test_settings.py -v)`; `(cd src && .venv/bin/python -m pytest tests -v)`.
+- Branch: `implementer/task-36b2-settings-relocation`; base/integration: `main`. Keep this branch through all recovery; no merge until 36b2 is complete.
+- Latest checkpoint: `f1af14c587daaf9165dda08a1fd314913391b889`, not approved; clean tree. Architect verified 76 headless tests and four image tests in isolation. Unsafe settings/full runs deferred.
+- Status/blocker: real popups, invalid fixtures, leaked roots, and product acceptance failures.
+- Revised approach: sequential interactive R1 tests, R2 decisions, R3 live-state/error recovery; keep partial work unmerged.
+- R1 scope: `implementer/src/tests/{conftest,test_dialog_guard,test_gui_settings}.py`; normal VERSION hook update only outside tests.
+- R1 acceptance: fail-fast suite-wide dialog protection, explicit expected responses, isolated aligned settings fixtures, reliable root cleanup, and passing guard regression tests. Settings/full suites run unattended and report remaining product failures without weakening assertions.
+- Remaining feature acceptance is captured in R2/R3 below. Required tests and exact commands are in the delegated prompt; both full runs must be unattended.
 
 ### Delegated Prompt
 
-You are the Implementer for Task 36b2. Work only on implementer/task-36b2-settings-relocation; main is its base and integration branch. First verify git branch --show-current and git status --short from implementer/. Stop without changes if the branch is wrong, is main, or the tree is dirty. Follow implementer/AGENTS.md, including the 1,200-second limit and checkpoint wrap-up.
+Implement Task 36b2 recovery R1: unattended GUI tests. Assigned branch: implementer/task-36b2-settings-relocation; main is base/integration. Start from checkpoint f1af14c587daaf9165dda08a1fd314913391b889 plus Architect planning commits. Verify git branch --show-current, git status --short, and checkpoint ancestry first. Stop if branch is wrong/main or tree dirty. Follow implementer/AGENTS.md and its 1,200-second limit/checkpoint wrap-up.
 
-Measure ../architect/DESIGN.md before reading it; use its Presentation/Controller components, Data Models and Flow, and Known Architectural Debt. Never read TASKS.md. Only edit settings-related GUI code in src/todo_md/app.py and src/tests/test_gui_settings.py under implementer/. The normal hook-generated VERSION update is allowed. Never modify any AGENTS.md, architect/ content, repository-root files, storage/controller behavior, or settings.py. No branch creation, switching, merging, rebasing, renaming, deletion, or pushing; no commits to main, broad staging, or destructive working-tree operations.
+Measure ../architect/DESIGN.md before reading its Presentation, External Interfaces, and Known Architectural Debt sections. Never read TASKS.md. Only change src/tests/test_gui_settings.py and add src/tests/conftest.py and src/tests/test_dialog_guard.py under implementer/. The normal VERSION hook update is allowed. No production, manifests, other tests, AGENTS.md, architect/, or repository-root changes. No branch create/switch/merge/rebase/rename/delete/push, main commits, broad staging, or destructive operations.
 
-Wire the settings Save handler to the existing TodoController.change_lists_dir. Compare the requested directory against controller.store.data_dir, not stale settings or constructor overrides. Blank/whitespace entry means DEFAULT_DATA_DIR, persisted as null. Normalize user paths and recognize equivalent existing directories; unchanged/equivalent paths must not prompt or relocate. Validate theme and completed-visible (integer 0-999) before any prompt, directory creation, relocation, or persistence. Invalid input shows an error, leaves the window open, and persists nothing.
+Before running settings/full suites, add a function-autouse guard preventing real modal dialogs across tests. Guard the common native-dialog path (tkinter.commondialog.Dialog.show covers current messageboxes/file pickers), record unexpected attempts and raise before opening anything. Also fail at fixture teardown if a Tk callback swallowed the exception. Do not create a Tk root merely by loading the fixture. Leave explicit public-function mocks usable for expected True/False/None choices and error assertions; never globally answer Yes or silently suppress unexpected dialogs. Add focused guard regressions, using isolated pytest runs if useful, proving direct and callback-contained unmocked dialogs fail without blocking, native file pickers are blocked, and explicitly mocked decisions still work.
 
-When changing directories and the active source contains at least one top-level Markdown file, call messagebox.askyesnocancel with this exact message, substituting paths: "You are about to change the directory where your lists are stored from '<old>' to '<new>' but there are already lists in it." Yes proceeds with move=True; No proceeds with move=False; popup Cancel keeps the old directory and files but still saves/applies other valid settings. Cancel must not validate or create the abandoned destination. Do not show the popup for an empty/missing source or non-Markdown-only source. A chosen destination containing Markdown lists, or an unusable directory, must show an error and not persist the attempted change. Reuse the controller/storage guard rather than duplicate relocation logic.
+Repair settings tests without changing intended product assertions. Isolate app.DEFAULT_DATA_DIR under tmp_path and align actual store, saved lists_dir, and dialog prefill. Preserve the distinction between initially absent settings and a preexisting payload; do not mutate caller dictionaries. Open Settings before accessing its variables/buttons. Assert prompt title and exact message separately. Patch todo_md.app.save_settings, where Save looks it up; restore real persistence for retry assertions. Prepare target directories before using them. Register reliable Tk cleanup immediately after app construction, including setup failures, and destroy roots even if update raises. Preserve update-before-destroy ordering. Keep explicit expected askyesnocancel/showerror mocks; do not permit native user interaction.
 
-On success, persist the full settings payload in the unchanged config directory, synchronize live data-directory state, apply theme/filter, refresh sidebar and item selection, and close the dialog. Subsequent edits must write only to the active destination; No must not leave editable stale source rows. Reopening and saving unchanged settings must not prompt or relocate again. The settings-window Cancel button remains a no-op for unsaved control edits.
+Do not redefine popup Cancel to match the broken implementation: it must keep the old directory while saving other valid settings. Blank entry must select the actual default directory, not merely save null. Retain tests for live sidebar/rows, destination-only writes, no-popup empty/equivalent paths, validation before effects, populated-target refusal, partial relocation failure, and settings-save failure with retry. Correct bogus setup/assertions but never skip, xfail, delete meaningful coverage, or mock the behavior under test just to turn tests green. Remaining real product failures are expected and belong to later recovery, not this tests-only micro-task.
 
-Catch expected filesystem/settings-save failures instead of leaking Tk callback errors. A relocation error must not persist the proposed settings; refresh from the still-bound source so already moved lists cannot be edited through stale rows. Report both paths and explain that some files may already be at the destination. Do not add rollback or delete retained files. If relocation succeeded but saving settings fails, keep the active destination usable, keep the dialog open, and clearly report that the directory preference is not saved for restart. Keep runtime directory state coherent and permit a Save retry without moving or prompting again; do not claim that an already completed move was undone. Pending theme/filter edits apply only after persistence succeeds.
+Run from implementer/: (cd src && .venv/bin/python -m pytest tests/test_dialog_guard.py -v), (cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_controller.py tests/test_storage.py tests/test_settings.py -v), and (cd src && .venv/bin/python -m pytest tests -v) twice as separate runs even if the first fails. Prefer tool workdir implementer/src/ with inner commands. Guard tests must pass; all runs must finish without human input or native dialogs. Record remaining failures accurately; do not claim full-feature success while they remain.
 
-Update the GUI test fixture to isolate DEFAULT_DATA_DIR as well as data/config paths under tmp_path and align the initial store with saved/default settings. Never access real user lists. Mock all messageboxes, and update/destroy every root in finally. Cover Yes/No/Cancel with exact prompt text, files and persisted payload; a dedicated empty-source no-popup case; populated destination (both choices), invalid path, invalid completed values before side effects; empty entry/default normalization and equivalent paths; live rows and destination-only writes; repeat Save; injected relocation failure including partial progress; and persistence failure followed by a successful retry. Preserve existing theme/filter and settings-window Cancel assertions.
-
-Run from implementer/: (cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_controller.py tests/test_storage.py tests/test_settings.py -v) and (cd src && .venv/bin/python -m pytest tests -v). Prefer tool workdir implementer/src/ with the inner commands. Both must pass; the two gated integration tests may stay skipped. Commit finished or stabilized partial work with explicit file staging and normal hooks. Report BRANCH, COMMIT, completed/remaining scope, exact commands/results, blockers, and final working-tree status; end with RESULT: SUCCESS or RESULT: FAILURE. Do not merge or push.
+Commit stabilized test changes with explicit staging and normal hooks; mark the checkpoint partial if product failures remain. Report BRANCH, COMMIT, harness fixes, remaining product failures with test names, exact command results for both full runs, and final tree status. End RESULT: FAILURE if any required suite fails, otherwise RESULT: SUCCESS for this delegated scope only. No merge or push; Architect reviews the checkpoint before the next recovery micro-task.
 
 ## Queue
 
-None.
+- **36b2-R2 (S):** correct Save decision/default-path flow on the same branch after R1. Yes/No/Cancel semantics; Cancel ignores abandoned destination but applies other settings; normalize blank/default paths and pass an actual path to the controller; validate theme/count first; no popup for empty/missing sources or equivalent paths; reject populated/unusable chosen targets. Exact message: "You are about to change the directory where your lists are stored from '<old>' to '<new>' but there are already lists in it."
+- **36b2-R3 (S):** synchronize live directory/sidebar/selection and handle relocation/save failures on the same branch after R2. Preserve retained files, refresh after partial moves, keep destination usable after save failure, report unsaved restart preference, and support retry without moving again. Full unattended suite must pass before approving/merging 36b2.
 
 ## Active Blockers
 
-- Interactive Implementer launch and handoff are required for 36b2; do not launch an unattended child while user approvals are inaccessible.
+- Unmocked dialogs and broken fixture lifecycle make settings/full-suite runs unsafe until R1 installs the guard.
+- Product acceptance failures remain in Cancel, default switching, live refresh, and error recovery; checkpoint is not mergeable.
+- Recovery awaits user-interactive Implementer execution; no unattended child launch.
 
 ## Recently Completed
 
-- 36b1: Headless controller directory switching; independently verified and merged; `9612b3b0708ffb40b58a407933ba3fdc5b0194e7`.
-- 36a: Headless lists-directory relocation; independently verified and merged; `f543275d8ed131dce5e0359ccf4f00aa847c0e3a`.
+- 36b1: Headless controller directory switching; verified and merged; `9612b3b`.
+- 36a: Headless lists-directory relocation; verified and merged; `f543275`.
 - 35b: Settings Save/Cancel; verified and merged; `9c45b49`.
 - 35a: Settings window construction; verified and merged; `895bfb5`.
 - 34: Completed-item display filter; verified and merged; `bf3ab84`.
