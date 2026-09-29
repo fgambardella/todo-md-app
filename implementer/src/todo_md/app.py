@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 from .models import TodoItem, TodoList
-from .storage import MarkdownListStore
+from .storage import MarkdownListStore, relocate_lists
 from .settings import (
     Settings,
     VALID_THEMES,
@@ -124,6 +124,25 @@ class TodoController:
     ) -> None:
         self.store = store
         self.data_dir = data_dir if data_dir is not None else store.data_dir
+
+    def change_lists_dir(self, new_dir: str | os.PathLike[str], move: bool) -> None:
+        """Switch storage after relocation succeeds; equivalent paths are a no-op.
+
+        Errors propagate without changing either binding. Relocation is per-file,
+        so an error can still leave some lists at the destination; no rollback is
+        attempted. Settings persistence is the caller's responsibility.
+        """
+        old_dir = self.store.data_dir
+        try:
+            if os.path.samefile(old_dir, new_dir):
+                return
+        except FileNotFoundError:
+            pass  # Relocation handles missing source/destination directories.
+
+        relocate_lists(old_dir, new_dir, move)
+        new_store = MarkdownListStore(new_dir)
+        self.store = new_store
+        self.data_dir = new_store.data_dir
 
     # -- list-level operations -------------------------------------------
 
