@@ -697,11 +697,15 @@ class TodoApp:
             else None
         )
 
+        # Resolve the effective target directory for comparison.
+        # None means DEFAULT_DATA_DIR; convert to string for path comparison.
+        effective_new_dir = new_lists_dir if new_lists_dir is not None else DEFAULT_DATA_DIR
+        old_dir = str(self.controller.store.data_dir)
+
         # If the active directory changed, check for existing Markdown lists
         # in the current store and prompt the user how to proceed.
-        old_dir = self.controller.store.data_dir
-        if new_lists_dir != old_dir:
-            if not self._directories_equivalent(old_dir, new_lists_dir):
+        if effective_new_dir != old_dir:
+            if not self._directories_equivalent(old_dir, effective_new_dir):
                 # Count Markdown files in the active store.
                 import os
                 existing_markdown = [
@@ -712,28 +716,31 @@ class TodoApp:
                     # Prompt Yes/No/Cancel
                     prompt = (
                         f"You are about to change the directory where your lists are stored "
-                        f"from '{old_dir}' to '{new_lists_dir}' but there are already lists in it."
+                        f"from '{old_dir}' to '{effective_new_dir}' but there are already lists in it."
                     )
                     result = messagebox.askyesnocancel("Confirm directory change", prompt)
                     if result is None:  # Cancel
-                        return
-                    move = result  # True = Yes, False = No
+                        # Keep old directory but persist other valid settings.
+                        new_lists_dir = old_dir
+                        effective_new_dir = old_dir
+                        move = None
+                    else:
+                        move = result  # True = Yes, False = No
                 else:
                     move = True  # No Markdown files, no prompt needed
 
-                # Attempt directory change if requested
-                if new_lists_dir:
-                    if move is not None:
-                        try:
-                            self.controller.change_lists_dir(new_lists_dir, move=move)
-                        except OSError as e:
-                            messagebox.showerror(
-                                "Directory change failed",
-                                f"Could not switch lists folder from '{old_dir}' to '{new_lists_dir}': "
-                                f"{e}\n\nSome files may already be at the destination. "
-                                "The directory preference is not saved for restart.",
-                            )
-                            return
+                # Attempt directory change if requested and not cancelled.
+                if move is not None and effective_new_dir != old_dir:
+                    try:
+                        self.controller.change_lists_dir(effective_new_dir, move=move)
+                    except OSError as e:
+                        messagebox.showerror(
+                            "Directory change failed",
+                            f"Could not switch lists folder from '{old_dir}' to '{effective_new_dir}': "
+                            f"{e}\n\nSome files may already be at the destination. "
+                            "The directory preference is not saved for restart.",
+                        )
+                        return
 
         new_settings = Settings(
             theme=theme,

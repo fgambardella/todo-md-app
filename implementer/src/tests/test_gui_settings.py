@@ -11,23 +11,34 @@ folder entry resets to DEFAULT_DATA_DIR (persisted as null). Equivalent
 paths are no-ops. Reopening unchanged settings should not prompt or
 relocate. Cancel is a full no-op that only closes the window.
 
-All tests avoid the real user lists directory by mocking or isolating
-tmp_path fixtures under DEFAULT_DATA_DIR or isolated directories.
+All tests avoid the real user lists directory by isolating under tmp_path.
+The dialog guard fixture blocks unmocked native dialogs.
 """
 
 import json
 from unittest.mock import patch
 
+import pytest
+
 from todo_md.app import DEFAULT_DATA_DIR, TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
+
+
+@pytest.fixture(autouse=True)
+def _isolate_default_data_dir(tmp_path, monkeypatch):
+    """Patch DEFAULT_DATA_DIR to tmp_path for all tests in this module."""
+    default_dir = str(tmp_path / "default_lists")
+    monkeypatch.setattr("todo_md.app.DEFAULT_DATA_DIR", default_dir)
+    return default_dir
 
 
 def _build_app(tmp_path, settings: dict | None = None, data_dir: str | None = None) -> TodoApp:
     """Build TodoApp with isolated data and config dirs under tmp_path.
 
-    If data_dir is not provided, use tmp_path as the active store data dir.
-    If settings includes lists_dir, use that for the store; otherwise,
-    seed data at tmp_path/data and configure settings accordingly.
+    If data_dir is not provided, use tmp_path/data as the active store.
+    If settings is None, no settings.json is written (app loads defaults).
+    If settings is provided, it is written before app construction so the
+    app loads it at startup. Never mutate the caller's dict.
     """
     if data_dir is not None:
         store = MarkdownListStore(data_dir)
@@ -36,17 +47,16 @@ def _build_app(tmp_path, settings: dict | None = None, data_dir: str | None = No
     controller = TodoController(store)
     config_dir = tmp_path / "config"
     config_dir.mkdir(exist_ok=True)
-    effective_data = data_dir if data_dir is not None else str(tmp_path / "data")
-    if settings is None:
-        settings = {"theme": "system", "lists_dir": None, "completed_visible": 10}
-    else:
-        # Ensure keys exist
-        settings.setdefault("theme", "system")
-        settings.setdefault("lists_dir", None)
-        settings.setdefault("completed_visible", 10)
-    (config_dir / "settings.json").write_text(
-        json.dumps(settings), encoding="utf-8"
-    )
+    if settings is not None:
+        # Copy so caller's dict is never mutated.
+        payload = {
+            "theme": settings.get("theme", "system"),
+            "lists_dir": settings.get("lists_dir"),
+            "completed_visible": settings.get("completed_visible", 10),
+        }
+        (config_dir / "settings.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
     return TodoApp(controller, config_dir=str(config_dir))
 
 
@@ -116,7 +126,7 @@ def test_settings_window_closes_cleanly(tmp_path):
         _teardown(app)
 
 
-def test_settings_prefill_defaults(tmp_path):
+def test_settings_prefill_defaults(tmp_path, _isolate_default_data_dir):
     """No settings file -> app defaults pre-fill the controls."""
     app = _build_app(tmp_path)
     try:
@@ -124,7 +134,7 @@ def test_settings_prefill_defaults(tmp_path):
         app._open_settings()
         app.root.update()
 
-        assert app._settings_lists_dir_var.get() == DEFAULT_DATA_DIR
+        assert app._settings_lists_dir_var.get() == _isolate_default_data_dir
         assert app._settings_theme_var.get() == "system"
         assert app._settings_completed_var.get() == 10
         selected = [
@@ -181,7 +191,7 @@ def test_settings_prefill_custom_settings(tmp_path):
         _teardown(app)
 
 
-def test_settings_reset_to_default(tmp_path):
+def test_settings_reset_to_default(tmp_path, _isolate_default_data_dir):
     custom = str(tmp_path / "custom")
     app = _build_app(tmp_path, {"lists_dir": custom})
     try:
@@ -192,7 +202,7 @@ def test_settings_reset_to_default(tmp_path):
 
         app._settings_reset_btn.invoke()
         app.root.update()
-        assert app._settings_lists_dir_var.get() == DEFAULT_DATA_DIR
+        assert app._settings_lists_dir_var.get() == _isolate_default_data_dir
     finally:
         _teardown(app)
 
@@ -201,19 +211,22 @@ def test_save_theme_persists_full_payload_and_reapplies(tmp_path):
     """Valid Save with a changed theme persists settings.json and re-applies
     the palette live (like the theme toggle)."""
     config_dir = tmp_path / "config"
-    app = _build_app(tmp_path)
+    data_dir = tmp_path / "data"
+    app = _build_app(tmp_path, data_dir=str(data_dir))
     try:
         app.root.update()
         assert not (config_dir / "settings.json").exists()
 
         app._open_settings()
         app.root.update()
+        # Keep lists_dir entry matching the actual store so no relocation happens.
+        app._settings_lists_dir_var.set(str(data_dir))
         app._settings_theme_var.set("dark")
         app._settings_save_btn.invoke()
         app.root.update()
 
         data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
-        assert data == {"theme": "dark", "lists_dir": None, "completed_visible": 10}
+        assert data == {"theme": "dark", "lists_dir": str(data_dir), "completed_visible": 10}
         assert app.settings.theme == "dark"
         assert app.theme == "dark"
         # Palette re-applied live (fallback clam path on this machine).
@@ -236,7 +249,9 @@ def test_save_completed_visible_persists_and_filters(tmp_path):
     """A changed completed_visible is persisted and the view hides completed
     items beyond the count live (0 hides all)."""
     config_dir = tmp_path / "config"
-    app = _build_app(tmp_path)  # default completed_visible = 10
+    # Store data_dir matches what the app uses, so no relocation prompt.
+    data_dir = tmp_path / "data"
+    app = _build_app(tmp_path, data_dir=str(data_dir))
     items = [
         ("a", False), ("b", False),
         ("c", True), ("d", True), ("e", True), ("f", True),
@@ -250,6 +265,8 @@ def test_save_completed_visible_persists_and_filters(tmp_path):
         app._open_settings()
         app.root.update()
         app._settings_completed_var.set(1)
+        # Ensure lists_dir entry matches actual store to avoid relocation.
+        app._settings_lists_dir_var.set(str(data_dir))
         app._settings_save_btn.invoke()
         app.root.update()
 
@@ -262,6 +279,7 @@ def test_save_completed_visible_persists_and_filters(tmp_path):
         app._open_settings()
         app.root.update()
         app._settings_completed_var.set(0)
+        app._settings_lists_dir_var.set(str(data_dir))
         app._settings_save_btn.invoke()
         app.root.update()
 
@@ -312,11 +330,12 @@ def test_save_invalid_dir_shows_error_keeps_open_persists_nothing(tmp_path):
         _teardown(app)
 
 
-def test_save_empty_dir_entry_persists_default_and_closes(tmp_path):
+def test_save_empty_dir_entry_persists_default_and_closes(tmp_path, _isolate_default_data_dir):
     """An empty folder entry means "reset to default": settings.json is
     written with lists_dir null and the window closes."""
     config_dir = tmp_path / "config"
-    app = _build_app(tmp_path)
+    # Use patched DEFAULT_DATA_DIR as the store so empty entry is a no-op.
+    app = _build_app(tmp_path, data_dir=_isolate_default_data_dir)
     try:
         app.root.update()
 
@@ -367,8 +386,6 @@ def test_cancel_edits_are_a_full_noop(tmp_path):
 def test_settings_save_relocate_yes_no_cancel_popups_correct_prompt(tmp_path):
     """When changing to a directory with existing Markdown files, exact
     prompt text is shown and Yes/No/Cancel are respected."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     (source / "work.md").write_bytes(b"# work\n- [ ] task\n")
@@ -377,25 +394,25 @@ def test_settings_save_relocate_yes_no_cancel_popups_correct_prompt(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         # Pre-fill the entry to the new directory
         app._settings_lists_dir_var.set(str(target))
 
         # Mock askyesnocancel to return Yes
         with patch("tkinter.messagebox.askyesnocancel", return_value=True) as patched:
-            app._open_settings()
-            app.root.update()
             with patch("tkinter.messagebox.showerror") as err:
                 app._settings_save_btn.invoke()
                 app.root.update()
 
-            assert patched.called
-            args = patched.call_args.args
-            assert len(args) == 1
-            prompt = args[0]
-            assert "You are about to change the directory where your lists are stored" in prompt
-            assert f"from '{source}' to '{target}'" in prompt
-            assert "but there are already lists in it" in prompt
-            assert err.call_count == 0  # no error
+        assert patched.called
+        args = patched.call_args.args
+        assert len(args) == 2  # title and message
+        prompt = args[1]
+        assert "You are about to change the directory where your lists are stored" in prompt
+        assert f"from '{source}' to '{target}'" in prompt
+        assert "but there are already lists in it" in prompt
+        assert err.call_count == 0  # no error
 
         # Settings persisted and window closed.
         data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
@@ -411,8 +428,6 @@ def test_settings_save_relocate_yes_no_cancel_popups_correct_prompt(tmp_path):
 
 def test_settings_save_relocate_no_keeps_source(tmp_path):
     """No on popup keeps source files and creates new empty destination."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     (source / "work.md").write_bytes(b"# work\n- [ ] task\n")
@@ -421,12 +436,12 @@ def test_settings_save_relocate_no_keeps_source(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
         # Mock askyesnocancel to return False (No)
         with patch("tkinter.messagebox.askyesnocancel", return_value=False):
-            app._open_settings()
-            app.root.update()
             app._settings_save_btn.invoke()
             app.root.update()
 
@@ -448,15 +463,19 @@ def test_settings_save_relocate_no_keeps_source(tmp_path):
 
 def test_settings_save_relocate_cancel_persists_other_settings(tmp_path):
     """Cancel on popup keeps old directory and still persists theme/completed."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     (source / "work.md").write_bytes(b"# work\n- [ ] task\n")
-    app = _build_app(tmp_path, {"theme": "dark", "lists_dir": str(source), "completed_visible": 10})
+    app = _build_app(
+        tmp_path,
+        {"theme": "dark", "lists_dir": str(source), "completed_visible": 10},
+        data_dir=str(source),
+    )
     target = tmp_path / "target"
     config_dir = tmp_path / "config"
     try:
+        app.root.update()
+        app._open_settings()
         app.root.update()
         # Change theme, completed, but cancel directory move
         app._settings_theme_var.set("light")
@@ -464,14 +483,12 @@ def test_settings_save_relocate_cancel_persists_other_settings(tmp_path):
         app._settings_lists_dir_var.set(str(target))
 
         with patch("tkinter.messagebox.askyesnocancel", return_value=None):
-            app._open_settings()
-            app.root.update()
             app._settings_save_btn.invoke()
             app.root.update()
 
-        # Directory unchanged (no prompt called), theme/completed saved.
+        # Directory unchanged (no relocation), theme/completed saved.
         assert app.settings_window is None
-        assert app.controller.store.data_dir == source
+        assert str(app.controller.store.data_dir) == str(source)
         data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
         assert data["theme"] == "light"
         assert data["lists_dir"] == str(source)
@@ -485,8 +502,6 @@ def test_settings_save_relocate_cancel_persists_other_settings(tmp_path):
 
 def test_settings_save_no_prompt_for_empty_source(tmp_path):
     """Empty or non-Markdown-only source does not trigger the pop-up."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     (source / "notes.txt").write_bytes(b"plain text only")
@@ -495,11 +510,11 @@ def test_settings_save_no_prompt_for_empty_source(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
         with patch("tkinter.messagebox.askyesnocancel") as patched:
-            app._open_settings()
-            app.root.update()
             app._settings_save_btn.invoke()
             app.root.update()
 
@@ -515,8 +530,6 @@ def test_settings_save_no_prompt_for_empty_source(tmp_path):
 
 def test_settings_save_populated_destination_rejected(tmp_path):
     """Destination with Markdown files raises error before any relocation."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     app = _build_app(tmp_path, data_dir=str(source))
@@ -526,11 +539,11 @@ def test_settings_save_populated_destination_rejected(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
         with patch("tkinter.messagebox.askyesnocancel") as patched:
-            app._open_settings()
-            app.root.update()
             with patch("tkinter.messagebox.showerror") as err:
                 app._settings_save_btn.invoke()
                 app.root.update()
@@ -548,22 +561,21 @@ def test_settings_save_populated_destination_rejected(tmp_path):
 
 def test_settings_save_invalid_completed_before_side_effects(tmp_path):
     """Invalid completed_visible is rejected before directory check."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     app = _build_app(tmp_path, data_dir=str(source))
     config_dir = tmp_path / "config"
     target = tmp_path / "target"
+    target.mkdir()
     (target / "work.md").write_bytes(b"# work\n- [ ] task\n")
     try:
+        app.root.update()
+        app._open_settings()
         app.root.update()
         app._settings_completed_var.set(9999)  # out of range
         app._settings_lists_dir_var.set(str(target))
 
         with patch("tkinter.messagebox.askyesnocancel") as patched:
-            app._open_settings()
-            app.root.update()
             with patch("tkinter.messagebox.showerror") as err:
                 app._settings_save_btn.invoke()
                 app.root.update()
@@ -577,11 +589,14 @@ def test_settings_save_invalid_completed_before_side_effects(tmp_path):
         _teardown(app)
 
 
-def test_settings_save_empty_entry_normalizes_to_null(tmp_path):
+def test_settings_save_empty_entry_normalizes_to_null(tmp_path, _isolate_default_data_dir):
     """Empty lists_dir entry resets to DEFAULT_DATA_DIR (persisted as null)."""
     config_dir = tmp_path / "config"
-    app = _build_app(tmp_path)
+    # Use patched DEFAULT_DATA_DIR as the store so empty entry is a no-op.
+    app = _build_app(tmp_path, data_dir=_isolate_default_data_dir)
     try:
+        app.root.update()
+        app._open_settings()
         app.root.update()
         app._settings_lists_dir_var.set("   ")  # whitespace only
         app._settings_save_btn.invoke()
@@ -590,15 +605,13 @@ def test_settings_save_empty_entry_normalizes_to_null(tmp_path):
         data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
         assert data["lists_dir"] is None
         assert app.settings.lists_dir is None
-        assert app.controller.store.data_dir == DEFAULT_DATA_DIR
+        assert str(app.controller.store.data_dir) == _isolate_default_data_dir
     finally:
         _teardown(app)
 
 
 def test_settings_save_equivalent_paths_no_prompt(tmp_path):
     """Same directory or symlink-equivalent paths do not prompt or relocate."""
-    from unittest.mock import patch
-
     source = tmp_path / "data"
     source.mkdir()
     (source / "work.md").write_bytes(b"# work\n- [ ] task\n")
@@ -608,11 +621,11 @@ def test_settings_save_equivalent_paths_no_prompt(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(target)
 
         with patch("tkinter.messagebox.askyesnocancel") as patched:
-            app._open_settings()
-            app.root.update()
             app._settings_save_btn.invoke()
             app.root.update()
 
@@ -629,8 +642,6 @@ def test_settings_save_equivalent_paths_no_prompt(tmp_path):
 
 def test_settings_save_live_rows_use_new_destination(tmp_path):
     """After successful Move, new list writes go to destination, not source."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     app = _build_app(tmp_path, data_dir=str(source))
@@ -638,16 +649,16 @@ def test_settings_save_live_rows_use_new_destination(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
         with patch("tkinter.messagebox.askyesnocancel", return_value=True):
-            app._open_settings()
-            app.root.update()
             app._settings_save_btn.invoke()
             app.root.update()
 
         assert app.settings_window is None
-        assert app.controller.store.data_dir == target
+        assert str(app.controller.store.data_dir) == str(target)
         # Create new list, items written to destination only.
         app.controller.create_list("new")
         app.controller.add_item("new", "task")
@@ -659,8 +670,6 @@ def test_settings_save_live_rows_use_new_destination(tmp_path):
 
 def test_settings_save_repeat_no_prompt_if_unchanged(tmp_path):
     """Reopening and saving unchanged settings does not prompt or relocate."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     app = _build_app(tmp_path, data_dir=str(source))
@@ -671,6 +680,7 @@ def test_settings_save_repeat_no_prompt_if_unchanged(tmp_path):
         with patch("tkinter.messagebox.askyesnocancel") as patched:
             app._open_settings()
             app.root.update()
+            # Entry is pre-filled with the current store path; save without changes.
             app._settings_save_btn.invoke()
             app.root.update()
 
@@ -691,26 +701,26 @@ def test_settings_save_repeat_no_prompt_if_unchanged(tmp_path):
 
 def test_settings_save_injected_relocation_failure(tmp_path):
     """Relocation failure shows error, does not persist, leaves window open."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
+    (source / "work.md").write_bytes(b"# work\n- [ ] task\n")
     app = _build_app(tmp_path, data_dir=str(source))
     target = tmp_path / "target"
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
-        def fail_relocation(*, old_dir, new_dir, move):
-            raise OSError("simulated disk failure")
-
-        with patch("todo_md.app.TodoController.change_lists_dir", side_effect=OSError("simulated disk failure")):
-            app._open_settings()
-            app.root.update()
-            with patch("tkinter.messagebox.showerror") as err:
-                app._settings_save_btn.invoke()
-                app.root.update()
+        with patch(
+            "todo_md.app.TodoController.change_lists_dir",
+            side_effect=OSError("simulated disk failure"),
+        ):
+            with patch("tkinter.messagebox.askyesnocancel", return_value=True):
+                with patch("tkinter.messagebox.showerror") as err:
+                    app._settings_save_btn.invoke()
+                    app.root.update()
 
         assert err.called
         args = err.call_args.args
@@ -718,17 +728,15 @@ def test_settings_save_injected_relocation_failure(tmp_path):
         assert app.settings_window is not None
         assert app.settings_window.winfo_exists()
         assert not (config_dir / "settings.json").exists()
-        assert app.controller.store.data_dir == source
+        assert str(app.controller.store.data_dir) == str(source)
         # Original file still in place
-        assert list(source.iterdir()) == []
+        assert (source / "work.md").read_bytes() == b"# work\n- [ ] task\n"
     finally:
         _teardown(app)
 
 
 def test_settings_save_persistence_failure_keeps_destination(tmp_path):
     """After successful relocation but failed settings save, keep destination usable."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     app = _build_app(tmp_path, data_dir=str(source))
@@ -736,14 +744,15 @@ def test_settings_save_persistence_failure_keeps_destination(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
-        with patch("todo_md.settings.save_settings", side_effect=OSError("simulated save failure")):
-            app._open_settings()
-            app.root.update()
-            with patch("tkinter.messagebox.showerror") as err:
-                app._settings_save_btn.invoke()
-                app.root.update()
+        with patch("todo_md.app.save_settings", side_effect=OSError("simulated save failure")):
+            with patch("tkinter.messagebox.askyesnocancel", return_value=True):
+                with patch("tkinter.messagebox.showerror") as err:
+                    app._settings_save_btn.invoke()
+                    app.root.update()
 
         assert err.called
         args = err.call_args.args
@@ -751,11 +760,10 @@ def test_settings_save_persistence_failure_keeps_destination(tmp_path):
         # Directory changed but settings not persisted
         assert app.settings_window is not None
         assert app.settings_window.winfo_exists()
-        assert app.controller.store.data_dir == target
-        # Window can be reopened and retried
-        with patch("todo_md.settings.save_settings"):
-            app._settings_save_btn.invoke()
-            app.root.update()
+        assert str(app.controller.store.data_dir) == str(target)
+        # Retry with real save_settings to verify persistence succeeds.
+        app._settings_save_btn.invoke()
+        app.root.update()
 
         data = json.loads((config_dir / "settings.json").read_text(encoding="utf-8"))
         assert data["lists_dir"] == str(target)
@@ -765,8 +773,6 @@ def test_settings_save_persistence_failure_keeps_destination(tmp_path):
 
 def test_settings_save_cancel_preserves_theme_filter_state(tmp_path):
     """After a Save fails, theme/filter changes are still applied live."""
-    from unittest.mock import patch
-
     source = tmp_path / "source"
     source.mkdir()
     app = _build_app(tmp_path, {"theme": "dark", "lists_dir": str(source), "completed_visible": 10})
@@ -774,12 +780,11 @@ def test_settings_save_cancel_preserves_theme_filter_state(tmp_path):
     config_dir = tmp_path / "config"
     try:
         app.root.update()
+        app._open_settings()
+        app.root.update()
         app._settings_lists_dir_var.set(str(target))
 
-        with patch("todo_md.settings.save_settings", side_effect=OSError("simulated save failure")):
-            app._open_settings()
-            app.root.update()
-            app._settings_completed_var.set(5)
+        with patch("todo_md.app.save_settings", side_effect=OSError("simulated save failure")):
             with patch("tkinter.messagebox.showerror"):
                 app._settings_save_btn.invoke()
                 app.root.update()
