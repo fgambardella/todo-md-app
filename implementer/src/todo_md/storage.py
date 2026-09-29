@@ -4,12 +4,57 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import tempfile
 
-__all__ = ["MarkdownListStore"]
+__all__ = ["MarkdownListStore", "relocate_lists"]
 
 _CHECKBOX_RE = re.compile(r"^- \[( |x|X)\](?: (.*))?$")
 _BAD_NAME_RE = re.compile(r"[^A-Za-z0-9_-]")
+
+
+def relocate_lists(old_dir, new_dir, move: bool) -> None:
+    """Create new_dir and optionally move top-level .md files there verbatim.
+
+    A destination containing Markdown files raises FileExistsError in either
+    mode. Moves never overwrite files, including ones created after validation.
+    On failure, already moved files stay in new_dir; the failing source remains
+    intact, possibly with a complete copy if deleting the source failed.
+    """
+    os.makedirs(new_dir, exist_ok=True)
+    with os.scandir(new_dir) as entries:
+        if any(entry.name.endswith(".md") and entry.is_file() for entry in entries):
+            raise FileExistsError(f"destination already contains Markdown files: {new_dir}")
+    if not move:
+        return
+
+    try:
+        with os.scandir(old_dir) as entries:
+            sources = sorted(
+                entry.path
+                for entry in entries
+                if entry.name.endswith(".md") and entry.is_file()
+            )
+    except FileNotFoundError:
+        return
+
+    for source in sources:
+        target = os.path.join(new_dir, os.path.basename(source))
+        created = False
+        try:
+            with open(source, "rb") as incoming:
+                with open(target, "xb") as outgoing:
+                    created = True
+                    shutil.copyfileobj(incoming, outgoing)
+        except BaseException:
+            if created:
+                try:
+                    os.unlink(target)
+                except OSError:
+                    pass
+            raise
+        # Close the complete copy before deleting the source, even across devices.
+        os.unlink(source)
 
 
 class MarkdownListStore:
