@@ -2,46 +2,52 @@
 
 ## Project Goal
 
-Build a macOS desktop TODO app in Python (stdlib only, no runtime dependencies). Every list is persisted as its own plain Markdown file using GitHub-flavored checkbox syntax — no database. The Tkinter GUI is layered above a headless, fully testable domain/persistence/controller core. Support light/dark themes with a persisted user setting and a sensible system default.
+Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist each list as a portable Markdown file with GFM checkboxes. Keep domain, persistence, and controller logic headlessly testable beneath the Tkinter GUI, with persistent settings and light/dark themes.
 
 ## Test Policy
 
-- Framework: pytest (selected as the standard Python framework).
-- Full suite, from `implementer/src`: `.venv/bin/python -m pytest tests -v`
-- Targeted: `.venv/bin/python -m pytest tests/<file>.py -v`
-- Gated: `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v` (full build + launch); `RUN_RELEASE_TESTS=1 .venv/bin/python -m pytest tests/test_release_package.py -v` (full release packaging: build + zip assertions).
-- GUI tests require a display (available on this Mac): destroy `root` in `finally`, call `root.update()` after building, probe effective colors via `winfo_rgb`. Headless tests must never launch the GUI.
+- Framework: pytest, already used throughout `implementer/src/tests/`.
+- Full suite from `implementer/`: `(cd src && .venv/bin/python -m pytest tests -v)`.
+- Targeted convention from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/<file>.py -v)`.
+- Tests require `implementer/src/` as working directory for existing relative asset paths; tools may set that workdir directly and run the inner command.
+- Build/release changes also require the corresponding gated tests from `implementer/src/`: `RUN_BUILD_TESTS=1 .venv/bin/python -m pytest tests/test_build_script.py -v`; `RUN_RELEASE_TESTS=1 .venv/bin/python -m pytest tests/test_release_package.py -v`.
+- GUI tests run on the local display, use isolated temporary data/config directories, and update Tk roots before destroying them in `finally`. Headless tests never launch the GUI.
 
 ## Current Implementation Summary
 
-- Markdown persistence: each list stored as its own `.md` file with GFM checkboxes, atomic writes, filename-safe names.
-- Domain layer: validated add/toggle/remove/rename of items with clear errors.
-- Headless controller: create/delete lists, add/toggle/remove items; every mutation persisted immediately.
-- GUI: list sidebar (create via button or Enter, delete), checkbutton item rows, add-item entry, per-item trash-icon delete; destructive actions gated by a Yes/No popup.
-- Both input fields show muted-gray placeholder hints: cleared on focus-in, counted as empty on submit.
-- Readability: item label colors adapt to background luminance in both themes; entry fills follow the palette.
-- Versioning: `todo_md/VERSION` auto-incremented (patch) by a pre-commit hook; shown as a low-contrast bottom-right badge that adapts on theme toggle.
-- Dock icon: custom macOS dock icon at startup (bundled PNG; JPEG source kept); fails soft.
-- Settings: headless `settings.json` core (theme, lists_dir, completed-visible), legacy-compat load, atomic save; system theme detected live, never persisted; startup honors a saved lists dir; config dir fixed at `~/.todo-md-app/config/`; theme switcher flips the whole window; darker hover/press button fills; item view hides completed beyond the count (top-first, 0 hides all); settings window: apply-on-Save (validate, persist full payload, default dir → null, live theme/filter re-apply), Cancel no-op; new lists dir effective at next startup.
-- Build: `scripts/build_app.sh` (PyInstaller, dev-only) builds a launchable `dist/todo-md.app` with post-build smoke check and custom Finder icon (`.icns` at build time); runtime stays stdlib-only.
-- Release packaging: `scripts/release_package.sh` zips the built bundle as `dist/todo-md-<version>-arm64.zip` (app at zip root, no `__MACOSX`); gated end-to-end test.
+- Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated item operations are persisted immediately.
+- The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions.
+- Light/dark themes include readable item text, entry fills, button states, and a theme-aware version badge; custom dock and Finder icons are supported.
+- Settings support theme, lists directory, and completed-item visibility, with tolerant loading and atomic saving. Startup honors the saved directory while configuration stays fixed.
+- A single-instance settings window validates and saves the full payload, applies theme/filter live, and leaves all settings unchanged on Cancel. Directory changes currently apply at restart.
+- Completed-item filtering is display-only and preserves stored content.
+- Build and release scripts produce a launch-tested Apple Silicon app bundle and versioned distributable ZIP.
 
 ## Active Task
 
-- **Task 36a (S, first micro of 36-M)** — Headless lists-dir relocation.
-  - Branch: `implementer/task-36a-relocate-headless` (base `main`).
-  - Prompt:
-    - You are the Implementer. Work ONLY on branch `implementer/task-36a-relocate-headless`; base and integration branch is `main`. From `implementer/` first verify `git branch --show-current` and `git status --short`. Boundaries: only files under `implementer/`; never touch `architect/` or the repo root; never modify `implementer/src/AGENTS.md`; no branch create/switch/merge/rename/delete/push; no commit to `main`; no destructive working-tree operations.
-    - Read `architect/DESIGN.md` (Persistence, Settings config, Data Models & Flow), `src/todo_md/storage.py`, `src/todo_md/app.py` (`TodoController`), and `src/tests/test_storage.py` / `test_controller.py` for patterns.
-    - Scope (headless only — no tkinter, no GUI wiring, no Save-handler changes; GUI wiring is the follow-up task): add a `relocate_lists(old_dir, new_dir, move)` capability in the headless layer (storage or controller, your call — keep it tkinter-free and importable for tests): (1) create `new_dir` on demand (including parents); (2) `move=True`: move every `*.md` file from `old_dir` to `new_dir` (e.g. `os.replace`); non-`.md` files in `old_dir` stay untouched; (3) `move=False`: lists stay in `old_dir`, `new_dir` created empty; (4) raise a clear error (never silent overwrite) if `new_dir` already exists and contains at least one `.md` file; (5) empty or missing `old_dir` with `move=True` is a no-op success (new dir still created).
-    - Tests (headless, temp dirs): `move=True` relocates `.md` files and leaves a stray non-`.md` file behind; `move=False` leaves all lists in place and creates the new dir; a target dir already containing a `.md` raises the clear error; empty old dir succeeds.
-    - Acceptance criteria: relocation is headless and unit-testable; all four behaviors covered; full suite green.
-    - Commands (from `implementer/src`): `.venv/bin/python -m pytest tests -v` (no failures/errors; 2 gated integration tests may stay skipped).
-    - Commit finished work on the branch; hand off with RESULT / BRANCH / COMMIT; if blocked, commit a `RESULT: FAILURE` checkpoint with the blocker.
+**36a: Headless lists-directory relocation (S, first micro-task of 36-M).**
+
+- Branch: `implementer/task-36a-relocate-headless`; base and integration: `main`.
+- Scope: `implementer/src/todo_md/storage.py` and `implementer/src/tests/test_storage.py`; automatic version-hook update allowed. No GUI changes.
+- Acceptance: create destination parents; optionally move only Markdown files without overwriting existing destination lists; preserve non-Markdown files; handle empty/missing source. Remain headless and pass full suite.
+- Required tests: moved contents and source cleanup; no-move; target containing Markdown rejected for both modes without source changes; empty/missing source; nested destination creation.
+- Exact commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_storage.py -v)`; `(cd src && .venv/bin/python -m pytest tests -v)`.
+
+### Delegated Prompt
+
+You are the Implementer for Task 36a. Work only on assigned branch implementer/task-36a-relocate-headless; main is its base and integration branch. First verify git branch --show-current and inspect git status --short from implementer/. If the branch is wrong or the tree is dirty, stop without modifying anything. Follow implementer/AGENTS.md, including the 1,200-second limit and checkpoint wrap-up.
+
+After measuring ../architect/DESIGN.md, read its Persistence component and Data Models and Flow context. Never read TASKS.md. Restrict edits to src/todo_md/storage.py and src/tests/test_storage.py under implementer/ (the normal automatic VERSION hook change is allowed). Never change any AGENTS.md, anything under architect/, or repository-root files. Do not create, switch, merge, rebase, rename, delete, or push branches; never commit to main. No broad staging or destructive working-tree operations.
+
+Implement a headless relocate_lists(old_dir, new_dir, move) capability in storage.py. Create the destination including parents. With move=True move each top-level *.md file, retaining its name and exact bytes; leave non-Markdown source content untouched. With move=False leave the source unchanged and create the destination. Reject a destination already containing any Markdown file with a clear exception before moving anything, for either mode. Empty or missing source is successful and still creates the destination. Use stdlib only and no tkinter imports. Do not change the GUI or controller. Preserve content on ordinary move failures and never deliberately overwrite a destination list.
+
+Add temp-directory unit tests for moved contents/non-Markdown preservation, no-move, populated-target rejection in both modes with unchanged source/target bytes, and empty/missing source with parent creation. Exact commands from implementer/: (cd src && .venv/bin/python -m pytest tests/test_storage.py -v) and (cd src && .venv/bin/python -m pytest tests -v). Prefer setting the tool workdir to implementer/src/ and running the inner commands directly. Both must pass; the two existing gated integration tests may remain skipped.
+
+Commit completed work or stabilized partial work on the assigned branch with explicit file staging and normal hooks. Report BRANCH, COMMIT, completed/remaining scope, exact test results, blockers, and final working-tree status; end with RESULT: SUCCESS or RESULT: FAILURE. A commit is a checkpoint, not integration approval. Do not merge or push.
 
 ## Queue
 
-- **Task 36b (later micro of 36-M, after 36a is merged)** — GUI wiring of lists-dir relocation: on Save with a changed lists dir, show a popup only when the old dir contains at least one list: `messagebox.askyesnocancel` with text "You are about to change the directory where your lists are stored from '<old>' to '<new>' but there are already lists in it." (Yes = proceed and move; No = proceed without moving; Cancel = keep old dir, other settings still apply); no popup when old dir is empty — dedicated GUI test required; target dir already has lists, or invalid completed-visible → error dialog, that change not persisted; empty path entry = default dir.
+- **36b: GUI lists-directory relocation**, remaining micro-task of 36-M after 36a merges. Size before promotion; split further if medium. On changed-directory Save, prompt only if the old directory has lists using `messagebox.askyesnocancel` and exact text: "You are about to change the directory where your lists are stored from '<old>' to '<new>' but there are already lists in it." Yes moves; No changes directory without moving; Cancel retains the old directory while applying other settings. No popup for empty source (dedicated GUI test). Reject target containing lists and invalid completed-visible without persisting that change; empty path selects default. Keep the live store consistent with any moved files.
 
 ## Active Blockers
 
@@ -49,8 +55,8 @@ None.
 
 ## Recently Completed
 
-- Task 35b — settings Save/Cancel: Save validates (dir / 0–999 / theme), persists full payload (default-dir → null), live re-applies theme + completed filter; Cancel full no-op; 5 GUI tests; recovered across two Implementer timeouts (Architect verified uncommitted tree, then commit-only micro-task); verified 127 passed/2 skipped (9c45b49).
-- Task 35a — settings window construction: main-window `Settings` button opens a single-instance pre-filled Toplevel (lists-folder Entry + Browse/Reset, theme radiobuttons, completed-visible Spinbox, Save/Cancel stubs writing nothing); verified 123 passed/2 skipped (895bfb5).
-- Task 34 — completed-items display filter: pure `visible_items(items, completed_visible)` (top-first hiding, 0 hides all, order preserved, storage untouched) + GUI row wiring via id-based visibility; recovered from committed checkpoint after timeout; verified 116 passed/2 skipped (bf3ab84, merged fcb7abb).
-- Task 33 — startup settings wiring: fixed config dir `~/.todo-md-app/config` (never derived from the lists dir, overridable for tests), headless `startup_dirs` derives data dir from saved `lists_dir` (default created on demand), store/controller built with it; verified 106 passed/2 skipped (998778c, merged 25f743a).
-- Task 32 — settings core: `todo_md/settings.py` (`Settings` dataclass, legacy-compat `load_settings`, validating atomic `save_settings`, `resolve_theme` with live never-persisted system detection); `theme.py` removed, GUI/tests migrated; verified 101 passed/2 skipped (b0c3be2, merged adbedc4).
+- 35b: Settings Save/Cancel; verified and merged; `9c45b49`.
+- 35a: Settings window construction; verified and merged; `895bfb5`.
+- 34: Completed-item display filter; verified and merged; `bf3ab84`.
+- 33: Startup settings wiring; verified and merged; `998778c`.
+- 32: Headless settings core; verified and merged; `b0c3be2`.
