@@ -333,7 +333,7 @@ class TodoApp:
         left.pack(side=tk.LEFT, fill=tk.Y)
         ttk.Label(left, text="Lists:").pack(anchor="w")
 
-        self.listbox = tk.Listbox(left, width=22, height=14)
+        self.listbox = tk.Listbox(left, width=22, height=14, exportselection=False)
         self.listbox.pack(fill=tk.X, pady=(2, 6))
         self.listbox.bind("<<ListboxSelect>>", self._on_select_list)
 
@@ -684,8 +684,9 @@ class TodoApp:
         abandoned target). Empty, missing, or non-Markdown-only sources need
         no prompt. The chosen target is validated only after the decision and
         applied through ``controller.change_lists_dir``. Filesystem errors are
-        reported, never raised into Tk. Batch rollback and persistence-failure
-        recovery are not handled here.
+        reported, never raised into Tk. The live view follows the bound store
+        even if relocation partially fails or preferences cannot be saved.
+        Completed moves are never rolled back.
 
         A valid Save writes the full payload via ``save_settings``, replaces
         the in-memory settings, then re-applies the theme and refreshes rows.
@@ -712,16 +713,26 @@ class TodoApp:
             )
             return
 
+        old_dir = str(self.controller.store.data_dir)
+        target = self._settings_lists_dir_var.get()
         try:
             proceed, new_lists_dir = self._decide_lists_dir(
-                messagebox, self._settings_lists_dir_var.get()
+                messagebox, target
             )
-        except OSError as e:
+            if not proceed:
+                return
+            self._sync_lists_directory()
+            new_lists_dir = self._lists_dir_setting(new_lists_dir)
+        except (OSError, UnicodeError) as e:
             messagebox.showerror(
-                "Settings", f"Could not inspect the lists folders:\n{e}"
+                "Settings",
+                f"Could not inspect or refresh the lists folders from '{old_dir}' "
+                f"to '{_normalize_dir(target.strip() or DEFAULT_DATA_DIR)}':\n{e}\n\n"
+                f"The active lists folder is '{self.controller.store.data_dir}'. "
+                "Some files may already be at the destination; completed moves "
+                "have not been undone. The directory preference is not saved "
+                "for restart. You can retry Save.",
             )
-            return
-        if not proceed:
             return
 
         new_settings = Settings(
@@ -736,8 +747,9 @@ class TodoApp:
             messagebox.showerror(
                 "Settings save failed",
                 f"The directory preference could not be saved:\n{e}\n\n"
-                f"The lists folder will remain '{self.controller.store.data_dir}' "
-                "until the next restart.",
+                f"The active lists folder is '{self.controller.store.data_dir}'. "
+                "Its preference is not saved for restart. Completed moves have "
+                "not been undone. You can retry Save without moving files again.",
             )
             return
 
@@ -754,17 +766,17 @@ class TodoApp:
         self._close_settings()
 
     def _decide_lists_dir(self, messagebox, entry_text: str) -> tuple[bool, str | None]:
-        """Resolve the entry into ``(proceed, lists_dir_setting)``.
+        """Resolve the entry into ``(proceed, chosen_directory)``.
 
         ``proceed`` is False when an error was already reported (nothing
-        persisted). ``lists_dir_setting`` is None for the effective default.
+        persisted). Successful paths are absolute, including the default.
         Raises OSError for directory inspection/equivalence failures.
         """
         target = _normalize_dir(entry_text.strip() or DEFAULT_DATA_DIR)
         old_dir = str(self.controller.store.data_dir)
 
         if _same_dir(old_dir, target):
-            return True, self._lists_dir_setting(target)
+            return True, target
 
         move = True
         if _has_markdown(old_dir):
@@ -774,7 +786,7 @@ class TodoApp:
             )
             answer = messagebox.askyesnocancel("Confirm directory change", prompt)
             if answer is None:  # Cancel: keep active directory, abandon target.
-                return True, self._lists_dir_setting(_normalize_dir(old_dir))
+                return True, _normalize_dir(old_dir)
             move = answer
 
         if not _valid_lists_dir_path(target):
@@ -787,14 +799,31 @@ class TodoApp:
         try:
             self.controller.change_lists_dir(target, move=move)
         except OSError as e:
+            refresh_error = ""
+            try:
+                self._sync_lists_directory()
+            except (OSError, UnicodeError) as refresh_exc:
+                refresh_error = f"\nCould not refresh the active lists folder: {refresh_exc}"
             messagebox.showerror(
                 "Directory change failed",
                 f"Could not switch lists folder from '{old_dir}' to '{target}': "
                 f"{e}\n\nSome files may already be at the destination. "
-                "The directory preference is not saved for restart.",
+                "Completed moves have not been undone. "
+                f"The active lists folder is '{self.controller.store.data_dir}'. "
+                f"The directory preference is not saved for restart.{refresh_error}",
             )
             return False, None
-        return True, self._lists_dir_setting(target)
+        return True, target
+
+    def _sync_lists_directory(self) -> None:
+        """Follow the bound store without applying pending theme/filter edits."""
+        self.data_dir = str(self.controller.store.data_dir)
+        # Keep an accurate runtime path even if default equivalence cannot be read.
+        self.settings.lists_dir = _normalize_dir(self.data_dir)
+        try:
+            self.settings.lists_dir = self._lists_dir_setting(self.settings.lists_dir)
+        finally:
+            self.refresh_lists()
 
     @staticmethod
     def _lists_dir_setting(path: str) -> str | None:
@@ -814,18 +843,23 @@ class TodoApp:
     def refresh_lists(self, select_first: bool = False) -> None:
         """Repopulate the listbox from the controller/store."""
         self.listbox.delete(0, "end")
-        for name in self.controller.list_names():
-            self.listbox.insert("end", name)
+        try:
+            names = self.controller.list_names()
+            for name in names:
+                self.listbox.insert("end", name)
 
-        if select_first and self.listbox.size():
-            self.listbox.selection_set(0)
-            self.listbox.see(0)
-            self._select_list_name(self.listbox.get(0))
-        elif self.current_list and self.current_list in self.controller.list_names():
-            self._select_list_name(self.current_list)
-        else:
+            if select_first and names:
+                self._select_list_name(names[0])
+            elif self.current_list in names:
+                self._select_list_name(self.current_list)
+            else:
+                self.current_list = None
+                self._clear_items()
+        except (OSError, UnicodeError):
+            self.listbox.delete(0, "end")
             self.current_list = None
             self._clear_items()
+            raise
 
     def _selected_name(self) -> str | None:
         sel = self.listbox.curselection()
@@ -837,6 +871,12 @@ class TodoApp:
             self._select_list_name(name)
 
     def _select_list_name(self, name: str) -> None:
+        names = self.listbox.get(0, "end")
+        self.listbox.selection_clear(0, "end")
+        if name in names:
+            index = names.index(name)
+            self.listbox.selection_set(index)
+            self.listbox.see(index)
         self.current_list = name
         self.title_label.config(text=name)
         self._refresh_items()

@@ -41,7 +41,11 @@ def make_app(tmp_path, default_dir):
     fails the test on uncaught Tk callback exceptions."""
     apps = []
 
-    def build(settings: dict | None = None, data_dir: str | None = None) -> TodoApp:
+    def build(
+        settings: dict | None = None,
+        data_dir: str | None = None,
+        app_data_dir: str | None = None,
+    ) -> TodoApp:
         """Actual store: explicit data_dir, else saved lists_dir, else default.
 
         settings=None writes no settings.json; a dict is copied verbatim
@@ -56,7 +60,7 @@ def make_app(tmp_path, default_dir):
         store_dir = data_dir or (settings or {}).get("lists_dir") or default_dir
         controller = TodoController(MarkdownListStore(store_dir))
         try:
-            app = TodoApp(controller, config_dir=str(config_dir))
+            app = TodoApp(controller, data_dir=app_data_dir, config_dir=str(config_dir))
         except BaseException:
             import tkinter
 
@@ -125,6 +129,37 @@ def _make_source(tmp_path, name="source") -> str:
     source.mkdir()
     (source / "work.md").write_bytes(MD)
     return str(source)
+
+
+def _assert_view(app, names, selected, items):
+    assert app.listbox.get(0, "end") == tuple(names)
+    assert app.current_list == selected
+    assert app._selected_name() == selected
+    assert app.listbox.curselection() == (
+        (names.index(selected),) if selected is not None else ()
+    )
+    assert app.title_label.cget("text") == (selected or "(no list selected)")
+    assert [(label.cget("text"), bool(var.get())) for var, _, label, _ in app._item_rows] == items
+    assert len(app.items_frame.winfo_children()) == len(items)
+    assert all(widget.winfo_exists() for row in app._item_rows for widget in row[1:])
+    assert app.callback_errors == []
+
+
+def _select_in_ui(app, name):
+    index = app.listbox.get(0, "end").index(name)
+    app.listbox.selection_clear(0, "end")
+    app.listbox.selection_set(index)
+    app.listbox.event_generate("<<ListboxSelect>>")
+    app.root.update()
+
+
+def _submit_entry(app, entry, text):
+    entry.delete(0, "end")
+    entry.insert(0, text)
+    entry.focus_force()
+    app.root.update()
+    entry.event_generate("<Return>")
+    app.root.update()
 
 
 # -- opening / prefill ---------------------------------------------------
@@ -217,6 +252,26 @@ def test_fixture_alignment_and_caller_dict_untouched(make_app, tmp_path, default
     explicit = str(tmp_path / "explicit")
     app2 = make_app({"lists_dir": str(tmp_path / "saved")}, data_dir=explicit)
     assert app2.controller.store.data_dir == explicit
+
+
+def test_constructor_override_is_preserved_until_directory_operation(make_app, tmp_path):
+    source = _make_source(tmp_path)
+    override = str(tmp_path / "display_override")
+    app = make_app({"lists_dir": source}, data_dir=source, app_data_dir=override)
+    assert app.data_dir == override
+    _open(app)
+    app._settings_cancel_btn.invoke()
+    assert app.data_dir == override
+    _assert_view(app, ["work"], "work", [("task", False)])
+
+    _open(app)
+    target = str(tmp_path / "target")
+    app._settings_lists_dir_var.set(target)
+    _, err = _save(app, True)
+    err.assert_not_called()
+    assert app.data_dir == app.controller.data_dir == app.controller.store.data_dir == target
+    assert app.settings.lists_dir == target
+    _assert_view(app, ["work"], "work", [("task", False)])
 
 
 # -- Save: theme / completed-visible -----------------------------------
@@ -342,8 +397,11 @@ def test_invalid_dir_empty_source_shows_error_keeps_open_persists_nothing(make_a
 
 def test_yes_moves_to_target_with_exact_prompt(make_app, tmp_path):
     source = _make_source(tmp_path)
+    (tmp_path / "source" / "archive.md").write_bytes(b"# archive\n- [x] earlier\n")
     target = str(tmp_path / "target")
     app = make_app(data_dir=source)
+    _select_in_ui(app, "work")
+    _assert_view(app, ["archive", "work"], "work", [("task", False)])
     _open(app)
     app._settings_lists_dir_var.set(target)
     ask, err = _save(app, True)
@@ -357,11 +415,19 @@ def test_yes_moves_to_target_with_exact_prompt(make_app, tmp_path):
     assert not os.path.exists(os.path.join(source, "work.md"))
     assert (tmp_path / "target" / "work.md").read_bytes() == MD
     assert app.controller.store.data_dir == target
-    assert app.controller.list_names() == ["work"]
+    assert app.controller.list_names() == ["archive", "work"]
+    assert app.data_dir == app.controller.data_dir == target
+    _assert_view(app, ["archive", "work"], "work", [("task", False)])
+    assert (tmp_path / "target" / "archive.md").read_bytes() == b"# archive\n- [x] earlier\n"
 
-    # Subsequent writes go to the destination only.
-    app.controller.create_list("new")
-    app.controller.add_item("new", "task")
+    # Real widget callbacks must edit the destination, not recreate source files.
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    _assert_view(app, ["archive", "work"], "work", [("task", True)])
+    assert (tmp_path / "target" / "work.md").read_bytes() == b"# work\n- [x] task\n"
+    _submit_entry(app, app.new_name_entry, "new")
+    _submit_entry(app, app.new_item_entry, "task")
+    _assert_view(app, ["archive", "new", "work"], "new", [("task", False)])
     assert (tmp_path / "target" / "new.md").read_bytes() == b"# new\n- [ ] task\n"
     assert os.listdir(source) == []
 
@@ -370,6 +436,8 @@ def test_no_switches_without_moving(make_app, tmp_path):
     source = _make_source(tmp_path)
     target = str(tmp_path / "target")
     app = make_app(data_dir=source)
+    _assert_view(app, ["work"], "work", [("task", False)])
+    old_widgets = app._item_rows[0][1:]
     _open(app)
     app._settings_lists_dir_var.set(target)
     ask, err = _save(app, False)
@@ -382,8 +450,14 @@ def test_no_switches_without_moving(make_app, tmp_path):
     assert (tmp_path / "source" / "work.md").read_bytes() == MD
     assert os.listdir(target) == []
     assert app.controller.list_names() == []
-    app.controller.create_list("new")
-    app.controller.add_item("new", "item")
+    assert app.data_dir == app.controller.data_dir == app.settings.lists_dir == target
+    _assert_view(app, [], None, [])
+    assert all(not widget.winfo_exists() for widget in old_widgets)
+    _submit_entry(app, app.new_item_entry, "must not edit the source")
+    assert os.listdir(target) == []
+    _submit_entry(app, app.new_name_entry, "new")
+    _submit_entry(app, app.new_item_entry, "item")
+    _assert_view(app, ["new"], "new", [("item", False)])
     assert (tmp_path / "target" / "new.md").read_bytes() == b"# new\n- [ ] item\n"
     assert (tmp_path / "source" / "work.md").read_bytes() == MD
 
@@ -691,6 +765,172 @@ def test_relocation_failure_reports_and_keeps_bindings(make_app, tmp_path):
     assert (tmp_path / "source" / "work.md").read_bytes() == MD
 
 
+@pytest.mark.parametrize("selected", ["ahead", "work"])
+def test_partial_relocation_refreshes_remaining_source_without_rollback(
+    make_app, tmp_path, selected
+):
+    source = _make_source(tmp_path)
+    moved_bytes = b"# ahead\n\n- [ ] move first\nretained formatting\n"
+    (tmp_path / "source" / "ahead.md").write_bytes(moved_bytes)
+    target = str(tmp_path / "target")
+    app = make_app({"lists_dir": source})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    store_before = app.controller.store
+    _select_in_ui(app, selected)
+    old_widgets = app._item_rows[0][1:]
+    _open(app)
+    app._settings_lists_dir_var.set(target)
+    copy = shutil.copyfileobj
+
+    def fail_second_copy(incoming, outgoing):
+        if os.path.basename(incoming.name) == "work.md":
+            outgoing.write(b"partial copy")
+            raise OSError("second copy failed")
+        return copy(incoming, outgoing)
+
+    with patch("todo_md.storage.shutil.copyfileobj", side_effect=fail_second_copy) as copying:
+        with patch("todo_md.app.save_settings") as save:
+            ask, err = _save(app, True)
+
+    ask.assert_called_once()
+    err.assert_called_once()
+    save.assert_not_called()
+    assert copying.call_count == 2
+    message = err.call_args.args[1]
+    for text in (source, target, "second copy failed", "Some files", "not been undone"):
+        assert text in message
+    assert app.settings_window.winfo_exists()
+    assert app.controller.store is store_before
+    assert app.data_dir == app.controller.data_dir == app.settings.lists_dir == source
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    assert (tmp_path / "target" / "ahead.md").read_bytes() == moved_bytes
+    assert not (tmp_path / "source" / "ahead.md").exists()
+    assert (tmp_path / "source" / "work.md").read_bytes() == MD
+    assert not (tmp_path / "target" / "work.md").exists()
+    assert all(not widget.winfo_exists() for widget in old_widgets)
+    if selected == "ahead":
+        _assert_view(app, ["work"], None, [])
+        _submit_entry(app, app.new_item_entry, "must not recreate moved list")
+        assert not (tmp_path / "source" / "ahead.md").exists()
+        _select_in_ui(app, "work")
+    _assert_view(app, ["work"], "work", [("task", False)])
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    _assert_view(app, ["work"], "work", [("task", True)])
+    assert (tmp_path / "source" / "work.md").read_bytes() == b"# work\n- [x] task\n"
+    assert (tmp_path / "target" / "ahead.md").read_bytes() == moved_bytes
+    assert sorted(os.listdir(source)) == ["work.md"]
+    assert sorted(os.listdir(target)) == ["ahead.md"]
+
+
+@pytest.mark.parametrize("read_method", ["lists", "load"])
+def test_relocation_failure_with_unreadable_source_clears_stale_view(
+    make_app, tmp_path, read_method
+):
+    source = _make_source(tmp_path)
+    target = str(tmp_path / "target")
+    app = make_app({"lists_dir": source})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    store_before = app.controller.store
+    old_widgets = app._item_rows[0][1:]
+    _open(app)
+    app._settings_lists_dir_var.set(target)
+    with patch.object(app.controller, "change_lists_dir", side_effect=OSError("move failed")):
+        with patch.object(store_before, read_method, side_effect=PermissionError("read denied")):
+            with patch("todo_md.app.save_settings") as save:
+                _, err = _save(app, True)
+
+    err.assert_called_once()
+    save.assert_not_called()
+    message = err.call_args.args[1]
+    for text in (source, target, "move failed", "Could not refresh", "read denied"):
+        assert text in message
+    assert app.controller.store is store_before
+    assert app.data_dir == app.controller.data_dir == app.settings.lists_dir == source
+    assert app.settings_window.winfo_exists()
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    assert (tmp_path / "source" / "work.md").read_bytes() == MD
+    _assert_view(app, [], None, [])
+    assert all(not widget.winfo_exists() for widget in old_widgets)
+    _submit_entry(app, app.new_item_entry, "must not edit a stale list")
+    assert (tmp_path / "source" / "work.md").read_bytes() == MD
+
+
+@pytest.mark.parametrize("read_method", ["lists", "load"])
+def test_successful_switch_with_refresh_error_retains_destination_and_retries(
+    make_app, tmp_path, read_method
+):
+    source = _make_source(tmp_path)
+    target = str(tmp_path / "target")
+    app = make_app({"theme": "light", "lists_dir": source})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    _open(app)
+    app._settings_lists_dir_var.set(target)
+    app._settings_theme_var.set("dark")
+    with patch.object(MarkdownListStore, read_method, side_effect=PermissionError("read denied")):
+        with patch("todo_md.app.save_settings") as save:
+            _, err = _save(app, True)
+
+    err.assert_called_once()
+    save.assert_not_called()
+    message = err.call_args.args[1]
+    for text in (source, target, "read denied", "not saved for restart", "retry Save"):
+        assert text in message
+    assert app.data_dir == app.controller.data_dir == app.controller.store.data_dir == target
+    assert app.settings.lists_dir == target
+    assert app.settings.theme == app.theme == "light"
+    assert app.settings_window.winfo_exists()
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    assert (tmp_path / "target" / "work.md").read_bytes() == MD
+    assert os.listdir(source) == []
+    _assert_view(app, [], None, [])
+
+    with patch.object(app.controller, "change_lists_dir") as change:
+        _, err = _save(app)
+    change.assert_not_called()
+    err.assert_not_called()
+    _assert_view(app, ["work"], None, [])
+    _select_in_ui(app, "work")
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    _assert_view(app, ["work"], "work", [("task", True)])
+    assert (tmp_path / "target" / "work.md").read_bytes() == b"# work\n- [x] task\n"
+    assert os.listdir(source) == []
+    assert _payload(tmp_path)["lists_dir"] == target
+
+
+def test_post_switch_preference_resolution_error_still_synchronizes_live_view(make_app, tmp_path):
+    source = _make_source(tmp_path)
+    target = str(tmp_path / "target")
+    app = make_app({"lists_dir": source})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    _open(app)
+    app._settings_lists_dir_var.set(target)
+    with patch.object(app, "_lists_dir_setting", side_effect=PermissionError("default denied")):
+        with patch("todo_md.app.save_settings") as save:
+            _, err = _save(app, True)
+
+    err.assert_called_once()
+    save.assert_not_called()
+    assert "default denied" in err.call_args.args[1]
+    assert target in err.call_args.args[1]
+    assert app.data_dir == app.controller.data_dir == app.controller.store.data_dir == target
+    assert app.settings.lists_dir == target
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    assert (tmp_path / "target" / "work.md").read_bytes() == MD
+    assert os.listdir(source) == []
+    _assert_view(app, ["work"], "work", [("task", False)])
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    assert (tmp_path / "target" / "work.md").read_bytes() == b"# work\n- [x] task\n"
+    with patch.object(app.controller, "change_lists_dir") as change:
+        _, err = _save(app)
+    change.assert_not_called()
+    err.assert_not_called()
+    assert _payload(tmp_path)["lists_dir"] == target
+    _assert_view(app, ["work"], "work", [("task", True)])
+
+
 # -- Cancel ------------------------------------------------------------
 
 
@@ -716,23 +956,125 @@ def test_cancel_edits_are_a_full_noop(make_app, tmp_path):
     assert app.root.winfo_exists()
 
 
-# -- Persistence failure (full recovery is separate work) ----------------
+# -- Persistence failure and retry -------------------------------------
 
 
 def test_settings_save_failure_keeps_destination_and_retry_persists(make_app, tmp_path):
-    source = tmp_path / "source"
-    source.mkdir()
+    source = _make_source(tmp_path)
+    original = b"# work\n- [ ] task\n- [x] older\n- [x] latest\n"
+    (tmp_path / "source" / "work.md").write_bytes(original)
     target = str(tmp_path / "target")
-    app = make_app(data_dir=str(source))
+    app = make_app({"lists_dir": source, "theme": "light", "completed_visible": 10})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    palette_before = dict(app._palette)
+    _assert_view(app, ["work"], "work", [("task", False), ("older", True), ("latest", True)])
     _open(app)
     app._settings_lists_dir_var.set(target)
-    with patch("todo_md.app.save_settings", side_effect=OSError("simulated save failure")):
-        _, err = _save(app)
+    app._settings_theme_rads[2].invoke()
+    app._settings_spinbox.delete(0, "end")
+    app._settings_spinbox.insert(0, "0")
+    with patch("todo_md.settings.os.replace", side_effect=OSError("simulated save failure")):
+        ask, err = _save(app, True)
 
+    ask.assert_called_once()
     err.assert_called_once()
     assert "not be saved" in " ".join(str(a) for a in err.call_args.args)
+    for text in (target, "active lists folder", "not saved for restart", "retry Save"):
+        assert text in err.call_args.args[1]
     assert app.settings_window is not None and app.settings_window.winfo_exists()
     assert app.controller.store.data_dir == target
+    assert app.data_dir == app.controller.data_dir == app.settings.lists_dir == target
+    assert (tmp_path / "target" / "work.md").read_bytes() == original
+    assert os.listdir(source) == []
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    assert os.listdir(tmp_path / "config") == ["settings.json"]
+    assert app.settings.theme == app.theme == "light"
+    assert app.settings.completed_visible == 10
+    assert app._palette == palette_before
+    assert app._settings_theme_var.get() == "dark"
+    assert app._settings_completed_var.get() == 0
+    _assert_view(app, ["work"], "work", [("task", False), ("older", True), ("latest", True)])
 
-    _save(app)
+    # The destination stays editable even before the preference can be saved.
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    _submit_entry(app, app.new_item_entry, "destination edit")
+    _assert_view(app, ["work"], "work", [
+        ("task", True), ("older", True), ("latest", True), ("destination edit", False)
+    ])
+    edited = b"# work\n- [x] task\n- [x] older\n- [x] latest\n- [ ] destination edit\n"
+    assert (tmp_path / "target" / "work.md").read_bytes() == edited
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    assert os.listdir(source) == []
+
+    with patch.object(app.controller, "change_lists_dir") as change:
+        _, err = _save(app)
+    change.assert_not_called()
+    err.assert_not_called()
     assert _payload(tmp_path)["lists_dir"] == target
+    assert _payload(tmp_path) == {"theme": "dark", "lists_dir": target, "completed_visible": 0}
+    assert app.settings_window is None
+    assert app.settings.theme == app.theme == "dark"
+    assert app.settings.completed_visible == 0
+    assert app._palette["bg"] == "#1e1e1e"
+    _assert_view(app, ["work"], "work", [("destination edit", False)])
+    assert (tmp_path / "target" / "work.md").read_bytes() == edited
+    assert os.listdir(source) == []
+
+
+@pytest.mark.parametrize("close", ["cancel", "window"])
+@pytest.mark.parametrize("persist", ["save", "theme"])
+def test_close_after_save_failure_keeps_active_directory_on_reopen(
+    make_app, tmp_path, close, persist
+):
+    source = _make_source(tmp_path)
+    target = str(tmp_path / "target")
+    app = make_app({"lists_dir": source, "theme": "light", "completed_visible": 10})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    _open(app)
+    app._settings_lists_dir_var.set(target)
+    app._settings_theme_rads[2].invoke()
+    app._settings_completed_var.set(0)
+    with patch("todo_md.settings.os.replace", side_effect=OSError("save denied")):
+        _, err = _save(app, True)
+    err.assert_called_once()
+    assert (tmp_path / "target" / "work.md").read_bytes() == MD
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
+    win = app.settings_window
+    if close == "cancel":
+        app._settings_cancel_btn.invoke()
+    else:
+        win.tk.call(win.protocol("WM_DELETE_WINDOW"))
+    app.root.update()
+    assert not win.winfo_exists()
+    assert app.settings_window is None
+    assert app.settings.theme == app.theme == "light"
+    assert app.settings.completed_visible == 10
+    assert app.data_dir == app.controller.data_dir == app.settings.lists_dir == target
+    _assert_view(app, ["work"], "work", [("task", False)])
+    _submit_entry(app, app.new_item_entry, "after closing")
+    assert (tmp_path / "target" / "work.md").read_bytes() == b"# work\n- [ ] task\n- [ ] after closing\n"
+    assert os.listdir(source) == []
+
+    with patch.object(app.controller, "change_lists_dir") as change:
+        with patch("tkinter.messagebox.askyesnocancel") as ask:
+            _open(app)
+            assert app._settings_lists_dir_var.get() == target
+            assert app._settings_theme_var.get() == "light"
+            assert app._settings_completed_var.get() == 10
+            assert (tmp_path / "config" / "settings.json").read_bytes() == before
+            if persist == "save":
+                app._settings_save_btn.invoke()
+            else:
+                app._settings_cancel_btn.invoke()
+                app._theme_btn.invoke()
+            app.root.update()
+        ask.assert_not_called()
+        change.assert_not_called()
+    assert _payload(tmp_path) == {
+        "theme": "light" if persist == "save" else "dark",
+        "lists_dir": target,
+        "completed_visible": 10,
+    }
+    _assert_view(app, ["work"], "work", [("task", False), ("after closing", False)])
+    assert os.listdir(source) == []
