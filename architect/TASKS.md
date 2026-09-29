@@ -16,7 +16,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 ## Current Implementation Summary
 
 - Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated item operations are persisted immediately.
-- Headless relocation can move Markdown lists without overwriting destination files, or prepare a new folder while leaving lists in place; non-Markdown content is preserved.
+- Headless relocation can move Markdown lists without overwriting destination files, or leave old lists in place and direct subsequent operations to a new folder; non-Markdown content is preserved.
 - The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions.
 - Light/dark themes include readable item text, entry fills, button states, and a theme-aware version badge; custom dock and Finder icons are supported.
 - Settings support theme, lists directory, and completed-item visibility, with tolerant loading and atomic saving. Startup honors the saved directory while configuration stays fixed.
@@ -26,27 +26,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-**36b1: Headless controller directory switching (S).**
-
-- Parent estimate: 36b is M, covering runtime store rebinding plus GUI decisions, validation, and persistence. Split sequentially into 36b1 (controller) and 36b2 (settings Save integration).
-- Branch: `implementer/task-36b1-relocate-controller`; base and integration: `main`.
-- Status: prepared for user-interactive delegation; no child process running.
-- Scope: `implementer/src/todo_md/app.py` imports and `TodoController` only; `implementer/src/tests/test_controller.py`; automatic VERSION hook change allowed.
-- Acceptance: a headless controller operation reuses storage relocation and binds future reads/writes to the destination only on success. No GUI/settings behavior changes. Same-directory requests are no-ops; failures propagate without changing the controller binding.
-- Required tests: moved lists remain editable at destination; no-move preserves old files and redirects new writes; populated/invalid destination and injected relocation failure retain old binding; same directory and equivalent paths do not relocate.
-- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_controller.py tests/test_storage.py tests/test_gui_headless.py -v)`; `(cd src && .venv/bin/python -m pytest tests -v)`.
-
-### Delegated Prompt
-
-You are the Implementer for Task 36b1. Work only on assigned branch implementer/task-36b1-relocate-controller; main is its base and integration branch. First verify git branch --show-current and git status --short from implementer/. Stop without changes if the branch is wrong, is main, or the tree is dirty. Follow implementer/AGENTS.md, including the 1,200-second time budget and stabilized-checkpoint wrap-up.
-
-Measure ../architect/DESIGN.md before reading it, then use its Controller/Persistence components, Data Models and Flow, and Known Architectural Debt. Never read TASKS.md. Only edit imports and TodoController in src/todo_md/app.py, plus src/tests/test_controller.py, under implementer/. The normal automatic VERSION hook change is allowed. Never modify any AGENTS.md, any architect/ file, or repository-root files. Do not create, switch, merge, rebase, rename, delete, or push branches. Never commit to main; no broad staging or destructive working-tree operations.
-
-Add one headless TodoController operation to change the lists directory, taking the new directory and whether to move existing lists. Reuse storage.relocate_lists, without reimplementing copying or changing storage.py. Use the currently bound store directory as the source of truth, not a potentially different constructor data_dir override. After successful relocation, bind the controller store and controller.data_dir consistently to the destination so all future list/item operations use it. With move=False, old lists remain on disk and the active destination starts without lists. Treat the same directory, including normalized or symlink-equivalent paths, as a no-op rather than rejecting its existing lists. If validation or relocation fails, propagate the error and leave the original store binding and controller.data_dir unchanged. Do not add batch rollback; the existing documented per-file failure semantics remain. Keep GUI, startup, and settings persistence behavior untouched, and keep imports headless.
-
-Add isolated temp-directory tests proving: move=True preserves contents and list discovery, then toggle/add writes only to the destination; move=False leaves old bytes intact and new list creation uses the destination; a populated destination and an invalid path leave bindings unchanged; an injected relocation error does not rebind; same-directory and equivalent-path requests preserve files without calling relocation; an explicit controller data_dir override does not cause relocation from the wrong source. Avoid new abstractions or unrelated refactoring.
-
-Exact commands from implementer/: (cd src && .venv/bin/python -m pytest tests/test_controller.py tests/test_storage.py tests/test_gui_headless.py -v) and (cd src && .venv/bin/python -m pytest tests -v). Prefer setting tool workdir to implementer/src/ and running the inner commands. Both must pass; the two gated integration tests may remain skipped. Commit completed or stabilized partial work with explicit file staging and normal hooks. Report BRANCH, COMMIT, completed/remaining work, commands/results, blockers, and final working-tree status; end with RESULT: SUCCESS or RESULT: FAILURE. A commit is a checkpoint, not approval. Do not merge or push.
+None.
 
 ## Queue
 
@@ -54,12 +34,12 @@ Exact commands from implementer/: (cd src && .venv/bin/python -m pytest tests/te
 
 ## Active Blockers
 
-- Interactive Implementer launch and handoff are required for 36b1; do not launch an unattended child while user approvals are inaccessible.
+None.
 
 ## Recently Completed
 
+- 36b1: Headless controller directory switching; independently verified, approved for merge; `9612b3b0708ffb40b58a407933ba3fdc5b0194e7`.
 - 36a: Headless lists-directory relocation; independently verified and merged; `f543275d8ed131dce5e0359ccf4f00aa847c0e3a`.
 - 35b: Settings Save/Cancel; verified and merged; `9c45b49`.
 - 35a: Settings window construction; verified and merged; `895bfb5`.
 - 34: Completed-item display filter; verified and merged; `bf3ab84`.
-- 33: Startup settings wiring; verified and merged; `998778c`.
