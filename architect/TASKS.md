@@ -27,11 +27,17 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 40: Settings Theme section appearance (S)
+
+- Branch: `implementer/task-40-settings-theme-style`; base/integration: `main`.
+- Scope: one focused Theme-section styling correction, including its surrounding horizontal margin.
+- Acceptance: section body, title and radio labels use the existing light/dark palette with readable text, including active/selected radio states. Both outer horizontal margins are nonzero and symmetric. Dialog margin background matches the surrounding palette. Existing/open/reopened dialogs follow live theme changes; native theme behavior and settings semantics remain intact.
+- Required tests: both palette values, relevant ttk state lookups, measured outer margins, open-dialog light/dark switching and reopening, plus existing geometry/behavior regressions.
+- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_gui_theme.py tests/test_gui_theme_switch.py -q)`; `(cd src && .venv/bin/python -m pytest tests -q)`.
+- Complete Implementer prompt: Fix task 40 in `src/todo_md/app.py` and `src/tests/test_gui_settings.py` only (normal hook VERSION change allowed). Use existing theme colors for the Settings Theme LabelFrame/title/radiobutton backgrounds and foregrounds, prevent default bright/tanned active fills, and add left/right outer margins consistent with adjacent content. Ensure the Toplevel background behind margins uses the same palette on opening and live theme changes. Preserve native theme fallback policy, radio selection, Save/Cancel semantics, content-aware geometry and centered actions. Add regression tests with existing isolated fixtures for startup and live/reopened theme transitions, active/selected styles, and real symmetric margins. Follow DESIGN Presentation/Tk constraints and run both exact commands. Do not change completion ordering or entry cursors yet.
 
 ## Queue
 
-- 40: Settings Theme section needs palette-matched light/dark backgrounds and left/right margins.
 - 41: Completed items must appear above incomplete items in completion order (oldest first); completing another item should evict only the oldest visible completed item when the configured limit is exceeded.
 - 42: Input-field insertion cursors must remain visible in light mode.
 
