@@ -47,13 +47,14 @@ def test_item_rows_follow_theme_switches(tmp_path):
         app._refresh_items()
         root.update()
 
-        _var, checkbutton, label, _del = app._item_rows[0]
+        _var, checkbutton, label, _del = app._item_rows[1]
+        assert label.cget("text") == "Alpha"
         row_frame = checkbutton.master
 
         def _row_widgets():
-            """Fetch fresh row 0 widgets (rows are rebuilt on every refresh)."""
-            cb = app._item_rows[0][1]
-            return cb.master, cb, app._item_rows[0][2]
+            """Fetch the incomplete row (rows are rebuilt on every refresh)."""
+            cb = app._item_rows[1][1]
+            return cb.master, cb, app._item_rows[1][2]
 
         assert lum(root, row_frame.cget("bg")) < 0.5
         assert lum(root, checkbutton.cget("bg")) < 0.5

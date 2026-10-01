@@ -433,20 +433,20 @@ def test_save_completed_visible_persists_and_filters(make_app, tmp_path):
     app.controller.store.save("L", items)
     app.refresh_lists(select_first=True)
     app.root.update()
-    assert len(app._item_rows) == 6
+    _assert_view(app, ["L"], "L", [items[i] for i in (2, 3, 4, 5, 0, 1)])
 
     _open(app)
     app._settings_completed_var.set(1)
     _save(app)
     assert _payload(tmp_path)["completed_visible"] == 1
     assert app.settings.completed_visible == 1
-    assert len(app._item_rows) == 3
+    _assert_view(app, ["L"], "L", [("f", True), ("a", False), ("b", False)])
 
     _open(app)
     app._settings_completed_var.set(0)
     _save(app)
     assert _payload(tmp_path)["completed_visible"] == 0
-    assert len(app._item_rows) == 2
+    _assert_view(app, ["L"], "L", [("a", False), ("b", False)])
     assert app.controller.store.load("L") == items
     assert app.settings_window is None
 
@@ -1206,7 +1206,7 @@ def test_settings_save_failure_keeps_destination_and_retry_persists(make_app, tm
     app = make_app({"lists_dir": source, "theme": "light", "completed_visible": 10})
     before = (tmp_path / "config" / "settings.json").read_bytes()
     palette_before = dict(app._palette)
-    _assert_view(app, ["work"], "work", [("task", False), ("older", True), ("latest", True)])
+    _assert_view(app, ["work"], "work", [("older", True), ("latest", True), ("task", False)])
     _open(app)
     app._settings_lists_dir_var.set(target)
     app._settings_theme_rads[2].invoke()
@@ -1232,16 +1232,16 @@ def test_settings_save_failure_keeps_destination_and_retry_persists(make_app, tm
     assert app._palette == palette_before
     assert app._settings_theme_var.get() == "dark"
     assert app._settings_completed_var.get() == 0
-    _assert_view(app, ["work"], "work", [("task", False), ("older", True), ("latest", True)])
+    _assert_view(app, ["work"], "work", [("older", True), ("latest", True), ("task", False)])
 
     # The destination stays editable even before the preference can be saved.
-    app._item_rows[0][1].invoke()
+    app._item_rows[2][1].invoke()
     app.root.update()
     _submit_entry(app, app.new_item_entry, "destination edit")
     _assert_view(app, ["work"], "work", [
-        ("task", True), ("older", True), ("latest", True), ("destination edit", False)
+        ("older", True), ("latest", True), ("task", True), ("destination edit", False)
     ])
-    edited = b"# work\n- [x] task\n- [x] older\n- [x] latest\n- [ ] destination edit\n"
+    edited = b"# work\n- [x] older\n- [x] latest\n- [x] task\n- [ ] destination edit\n"
     assert (tmp_path / "target" / "work.md").read_bytes() == edited
     assert (tmp_path / "config" / "settings.json").read_bytes() == before
     assert os.listdir(source) == []

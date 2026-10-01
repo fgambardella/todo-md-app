@@ -69,30 +69,20 @@ def dock_icon_path() -> str:
 def visible_items(
     items: list[TodoItem], completed_visible: int
 ) -> list[TodoItem]:
-    """Pure, display-only filter: which items the GUI shows for one list.
+    """Show the newest N completions, oldest-first, then all incomplete items.
 
-    ``items`` is the ordered item list; ``completed_visible`` is how many
-    completed items stay visible (an int >= 0).  When the number of
-    completed items exceeds ``completed_visible``, the excess is hidden
-    starting from the TOP of the list — the bottom-most completed items
-    remain visible.  All incomplete items always stay, ``0`` hides every
-    completed item, and the order of the returned items is preserved.
+    Relative completed order in ``items`` records completion order, including
+    legacy interleaved files. ``completed_visible`` must be >= 0; zero hides
+    all completions. Incomplete items keep their relative order.
 
     This never touches storage: the on-disk list keeps every item; the
     result is a new list (never the input) for display only.
     """
     if completed_visible < 0:
         raise ValueError(f"completed_visible must be >= 0, got {completed_visible!r}")
-    to_hide = sum(1 for item in items if item.done) - completed_visible
-    if to_hide <= 0:
-        return list(items)
-    result: list[TodoItem] = []
-    for item in items:
-        if item.done and to_hide > 0:
-            to_hide -= 1
-            continue
-        result.append(item)
-    return result
+    completed = [item for item in items if item.done]
+    incomplete = [item for item in items if not item.done]
+    return (completed[-completed_visible:] if completed_visible else []) + incomplete
 
 
 def _valid_lists_dir_path(path: str) -> bool:
@@ -981,16 +971,11 @@ class TodoApp:
 
         todo_list = self.controller.open_list(self.current_list)
         row_bg = self._palette["bg"] if self._palette is not None else None
-        # Display-only completed-items filter: hidden rows are skipped here,
-        # but original list indices (for toggle/delete) and on-disk storage
-        # are untouched. Identity is used because TodoItem is an eq dataclass
-        # and duplicate text/done pairs must not be conflated.
-        visible_ids = {
-            id(item) for item in visible_items(todo_list.items, self.settings.completed_visible)
-        }
-        for index, item in enumerate(todo_list.items):
-            if id(item) not in visible_ids:
-                continue
+        # Display order can differ from storage; equal duplicate items still
+        # need their own original indices for toggle/delete callbacks.
+        stored_indexes = {id(item): index for index, item in enumerate(todo_list.items)}
+        for item in visible_items(todo_list.items, self.settings.completed_visible):
+            index = stored_indexes[id(item)]
             row_kwargs = {"bg": row_bg} if row_bg is not None else {}
             row = tk.Frame(self.items_frame, **row_kwargs)
             row.pack(anchor="w", fill=tk.X)
