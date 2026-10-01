@@ -27,11 +27,18 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 42: Visible input insertion cursors (S)
+
+- Branch: `implementer/task-42-input-caret-contrast`; base/integration: `main`.
+- Scope: focused theme-style correction for all editable input carets.
+- Acceptance: list-name, new-item, Settings folder and completed-count spinbox carets contrast with their effective field backgrounds in light and dark modes, both startup and live switches. Fields keep their text, focus/editing and placeholder behavior; open/reopened Settings controls receive current styles. Preserve native appearance/fallback policy.
+- Required tests: actual widgets and effective ttk insertion-color/field-background options, light/dark contrast, focused editing, live transitions and settings reopen; existing placeholder/theme/settings regressions.
+- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_theme.py tests/test_gui_settings.py tests/test_gui_placeholders.py -q)`; `(cd src && .venv/bin/python -m pytest tests -q)`.
+- Complete Implementer prompt: Fix task 42 in `src/todo_md/app.py`, `src/tests/test_gui_theme.py`, and `src/tests/test_gui_settings.py` only (normal hook VERSION change allowed). Inspect the actual ttk Entry/Spinbox insertion-color option rather than assuming plain tk insertbackground applies. Explicitly theme carets and any necessary field colors using the existing palette for all four input kinds. Preserve native appearance handling, existing state/placeholder behavior and every earlier layout/order fix. Add isolated real-widget tests proving contrasting insertion colors at startup and after light/dark transitions, including Settings open/reopen and focused editing. Use existing managed-root fixtures where available and fail-fast dialogs. Follow DESIGN Presentation/Tk constraints and run both commands. No unrelated refactoring.
 
 ## Queue
 
-- 42: Input-field insertion cursors must remain visible in light mode.
+None.
 
 ## Active Blockers
 
