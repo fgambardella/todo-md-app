@@ -40,9 +40,17 @@ class TodoList:
         return item
 
     def toggle(self, index: int) -> TodoItem:
-        """Flip the done state of the item at ``index`` and return it."""
+        """Toggle an item and move it to the completed/incomplete boundary.
+
+        Existing groups keep their order: a completion becomes the newest,
+        while an undone item leads the incomplete group.
+        """
         item = self.items[index]
         item.done = not item.done
+        del self.items[index]
+        completed = [other for other in self.items if other.done]
+        incomplete = [other for other in self.items if not other.done]
+        self.items[:] = completed + [item] + incomplete
         return item
 
     def remove(self, index: int) -> TodoItem:
