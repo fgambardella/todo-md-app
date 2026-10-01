@@ -17,6 +17,7 @@ Tk callback exceptions and the fixture fails the test if any occurred.
 import json
 import os
 import shutil
+from itertools import combinations
 from unittest.mock import patch
 
 import pytest
@@ -168,6 +169,71 @@ def test_settings_button_exists_and_opens_toplevel(make_app):
     assert isinstance(win, tk.Toplevel)
     assert win.master is app.root
     assert win.title() == "Settings"
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("size", ["initial", "enlarged", "minimum"])
+def test_settings_controls_fit_and_actions_stay_centered(make_app, theme, size):
+    app = make_app({"theme": theme})
+    _open(app)
+    win = app.settings_window
+    assert app.theme == theme
+    if size != "initial":
+        initial_width, initial_height = win.winfo_width(), win.winfo_height()
+        win.geometry(f"{initial_width + 120}x{initial_height + 80}")
+        app.root.update()
+        assert win.winfo_width() > initial_width
+        assert win.winfo_height() > initial_height
+        if size == "minimum":
+            width, height = win.minsize()
+            win.geometry(f"{width}x{height}")
+            app.root.update()
+            assert (win.winfo_width(), win.winfo_height()) == (width, height)
+            win.geometry(f"{max(1, width - 40)}x{max(1, height - 40)}")
+            app.root.update()
+            assert (win.winfo_width(), win.winfo_height()) == (width, height)
+
+    # Check every field, label and action, including clipping by any ancestor.
+    widgets = list(win.winfo_children())
+    controls = []
+    for widget in widgets:
+        children = widget.winfo_children()
+        widgets.extend(children)
+        if not children:
+            controls.append(widget)
+        assert widget.winfo_ismapped(), f"{widget} is not mapped"
+        width, height = widget.winfo_width(), widget.winfo_height()
+        assert width >= widget.winfo_reqwidth(), f"{widget} width is clipped"
+        assert height >= widget.winfo_reqheight(), f"{widget} height is clipped"
+        x, y = widget.winfo_rootx(), widget.winfo_rooty()
+        ancestor = widget.master
+        while True:
+            assert ancestor.winfo_ismapped(), f"{ancestor} is not mapped"
+            ax, ay = ancestor.winfo_rootx(), ancestor.winfo_rooty()
+            assert ax <= x and x + width <= ax + ancestor.winfo_width(), (
+                f"{widget} extends outside {ancestor} horizontally"
+            )
+            assert ay <= y and y + height <= ay + ancestor.winfo_height(), (
+                f"{widget} extends outside {ancestor} vertically"
+            )
+            if ancestor is win:
+                break
+            ancestor = ancestor.master
+
+    for first, second in combinations(controls, 2):
+        assert (
+            first.winfo_rootx() + first.winfo_width() <= second.winfo_rootx()
+            or second.winfo_rootx() + second.winfo_width() <= first.winfo_rootx()
+            or first.winfo_rooty() + first.winfo_height() <= second.winfo_rooty()
+            or second.winfo_rooty() + second.winfo_height() <= first.winfo_rooty()
+        ), f"{first} overlaps {second}"
+
+    cancel, save = app._settings_cancel_btn, app._settings_save_btn
+    assert cancel.winfo_rootx() + cancel.winfo_width() < save.winfo_rootx()
+    assert cancel.winfo_rooty() == save.winfo_rooty()
+    group_midpoint = (cancel.winfo_rootx() + save.winfo_rootx() + save.winfo_width()) / 2
+    window_midpoint = win.winfo_rootx() + win.winfo_width() / 2
+    assert abs(group_midpoint - window_midpoint) <= 2
 
 
 def test_settings_window_opens_once(make_app):
