@@ -27,21 +27,23 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 37: Populated lists destinations (M)
+
+- Branch: `implementer/task-37-populated-lists-dir`; base/integration: `main`.
+- Scope: allow populated destinations without overwriting any existing path; preserve existing optional transfer behavior. Complete sequential S micro-tasks: 37a headless collision policy, then 37b settings integration and explicit confirmation question. Merge only after both pass.
+- Status: ready for 37a; baseline full suite verified (219 passed, 2 gated skips).
+- Acceptance: switching without transfer accepts any populated directory and preserves both sides. Transfers accept unrelated destination lists, reject same-name target paths before moving any source, and retain exclusive creation against races. Filesystem failures preserve recoverability. Settings switch/persist/refresh correctly for Yes/No/Cancel, and the prompt ends with `Do you want to copy them in the new path?`. Existing unrelated behavior remains unchanged.
+- Required tests: storage/controller success and conflict cases, no-transfer same-name files, preflight conflicts later in sorted order, destination directories/symlinks, and existing copy/race/deletion-failure regressions. GUI coverage and full suite follow in 37b.
+- 37a command from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_storage.py tests/test_controller.py -v)`.
+- Complete current Implementer prompt: Implement only 37a. Edit `src/todo_md/storage.py`, `src/tests/test_storage.py`, and `src/tests/test_controller.py` (normal hook VERSION change allowed). Remove the blanket populated-directory rejection. Without transfer, leave all existing files alone and permit switching. With transfer, enumerate source Markdown files, reject any existing same-name destination path before moving anything (including directories and dangling symlinks), and preserve exclusive creation and current partial-I/O-failure behavior. Do not change move-versus-copy semantics or the storage format. Update contradictory storage/controller tests and cover non-conflicting populated targets, same-name conflicts, and no-transfer switching with colliding names. Preserve all failure/race tests. Follow DESIGN Component Architecture and Data Models and Flow; this task replaces the old blanket rejection policy. Run the exact targeted command above. Existing GUI rejection tests are deliberately updated by 37b before the task is merged; do not edit GUI files in this micro-task.
 
 ## Queue
 
-- Functional change request: now it is forbidden to the user to select a non empty destination directory for lists. The user receives the following message:
-"Could not switch lists folder from '...' to '...': destination already contains Markdown files: ...". I want that the user can select a not empty destination directory and, if it decide to proceed copying list files from the source directory, the operation fails only if in the destination directory there is already a file with the same name of a file in the source directory. No file overwrite permitted.
-Some files may already be at the destination. Completed moves have not been undone. The active lists folder is '/Users/flavio/.todo-md-app/lists'. The directory preference is not saved for restart.
-- GUI BUG: when the app main window opens, the setting button is partially hidden.
-- GUI BUG: when the setting window opens, the cancel/save buttons are partially hidden.
-- GUI BUG: in the setting window, the cancel/save buttons must be orizzontally centered.
-- GUI BUG: in the setting window the "theme" section has a too bright background in dark mode and too tanned background in light mode.
-- GUI BUG: in the setting window the "theme" section lacks of left and right margin.
-- GUI BUG: in the setting window the confirmation message: "You are about to change the directory where your lists are stored from '...' to '...' but there are already lists in it." misses a foundamental final part: the question! It should be: "You are about to change the directory where your lists are stored from '...' to '...' but there are already lists in it. Do you want to copy them in the new path?"
-- GUI BUG: in the todolist, the completed list items must be always shown on top, in order of completion (from least recently completed on the very top and the last recently completed just before the first uncompleted one). Only the least recently completed list item must be hidden when a list item is completed.
-- GUI BUG: in light mode, the cursor disappear in all input fields (probably white over white).
+- 38: Main-window Settings button must be fully visible on opening.
+- 39: Settings Save/Cancel buttons must be fully visible on opening and horizontally centered.
+- 40: Settings Theme section needs palette-matched light/dark backgrounds and left/right margins.
+- 41: Completed items must appear above incomplete items in completion order (oldest first); completing another item should evict only the oldest visible completed item when the configured limit is exceeded.
+- 42: Input-field insertion cursors must remain visible in light mode.
 
 ## Active Blockers
 
