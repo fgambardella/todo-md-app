@@ -1,9 +1,12 @@
 """Tests for TodoController (todo_md/app.py)."""
 
+from unittest.mock import Mock
+
 import pytest
 
 from todo_md import app as app_module
 from todo_md.app import TodoController
+from todo_md.models import TodoItem, TodoList
 from todo_md.storage import MarkdownListStore
 
 
@@ -37,6 +40,120 @@ def test_toggle_item_flips_checkbox_on_disk(controller, tmp_path):
     content = _file(tmp_path, "work").read_text(encoding="utf-8")
     assert "- [ ] task one" in content
     assert "- [x] task one" not in content
+
+
+def test_toggle_completion_order_persists_through_undo_recompletion_and_reload(
+    controller, tmp_path
+):
+    controller.create_list("work")
+    for text in ("first", "second", "third", "fourth"):
+        controller.add_item("work", text)
+
+    third = controller.toggle_item("work", 2)
+    assert (third.text, third.done) == ("third", True)
+    first = controller.toggle_item("work", 1)
+    assert (first.text, first.done) == ("first", True)
+    fourth = controller.toggle_item("work", 3)
+    assert (fourth.text, fourth.done) == ("fourth", True)
+    path = _file(tmp_path, "work")
+    assert path.read_text(encoding="utf-8") == (
+        "# work\n- [x] third\n- [x] first\n- [x] fourth\n- [ ] second\n"
+    )
+
+    reloaded = TodoController(MarkdownListStore(path.parent))
+    assert [(item.text, item.done) for item in reloaded.open_list("work").items] == [
+        ("third", True), ("first", True), ("fourth", True), ("second", False)
+    ]
+    undone = reloaded.toggle_item("work", 0)
+    assert (undone.text, undone.done) == ("third", False)
+    assert path.read_text(encoding="utf-8") == (
+        "# work\n- [x] first\n- [x] fourth\n- [ ] third\n- [ ] second\n"
+    )
+
+    reloaded = TodoController(MarkdownListStore(path.parent))
+    recompleted = reloaded.toggle_item("work", 2)
+    assert (recompleted.text, recompleted.done) == ("third", True)
+    assert path.read_text(encoding="utf-8") == (
+        "# work\n- [x] first\n- [x] fourth\n- [x] third\n- [ ] second\n"
+    )
+    reloaded = TodoController(MarkdownListStore(path.parent))
+    assert [(item.text, item.done) for item in reloaded.open_list("work").items] == [
+        ("first", True), ("fourth", True), ("third", True), ("second", False)
+    ]
+    assert list(path.parent.iterdir()) == [path]
+
+
+def test_toggle_groups_legacy_items_without_load_time_writes(
+    controller, tmp_path, monkeypatch
+):
+    path = _file(tmp_path, "work")
+    original = (
+        "# work\n- [ ] pending first\n- [x] oldest\n- [ ] selected\n"
+        "- [x] newer\n- [ ] pending second\n"
+    )
+    path.write_text(original, encoding="utf-8")
+    save = Mock(wraps=controller.store.save)
+    monkeypatch.setattr(controller.store, "save", save)
+
+    loaded = controller.open_list("work")
+
+    save.assert_not_called()
+    assert [item.text for item in loaded.items] == [
+        "pending first", "oldest", "selected", "newer", "pending second"
+    ]
+    assert path.read_text(encoding="utf-8") == original
+
+    selected = controller.toggle_item("work", 2)
+
+    assert (selected.text, selected.done) == ("selected", True)
+    save.assert_called_once_with("work", [
+        ("oldest", True), ("newer", True), ("selected", True),
+        ("pending first", False), ("pending second", False),
+    ])
+    assert path.read_text(encoding="utf-8") == (
+        "# work\n- [x] oldest\n- [x] newer\n- [x] selected\n"
+        "- [ ] pending first\n- [ ] pending second\n"
+    )
+
+
+@pytest.mark.parametrize("done", [False, True])
+@pytest.mark.parametrize("index", [2, -1])
+def test_toggle_returns_exact_duplicate_object_after_reordering(
+    controller, monkeypatch, done, index
+):
+    first = TodoItem("same", done=done, created=1234.5)
+    selected = TodoItem("same", done=done, created=1234.5)
+    pending = TodoItem("pending")
+    todo_list = TodoList("work", [first, pending, selected])
+    assert first == selected and first is not selected
+    monkeypatch.setattr(controller, "open_list", lambda name: todo_list)
+
+    assert controller.toggle_item("work", index) is selected
+
+    expected = [first, selected, pending] if done else [selected, first, pending]
+    assert [id(item) for item in todo_list.items] == [id(item) for item in expected]
+    assert first.done is done
+    assert selected.done is not done
+    reloaded = TodoController(MarkdownListStore(controller.store.data_dir))
+    assert [(item.text, item.done) for item in reloaded.open_list("work").items] == [
+        (item.text, item.done) for item in expected
+    ]
+
+
+@pytest.mark.parametrize("index", [2, -3, 1.5, "1", None])
+def test_toggle_invalid_index_does_not_save(controller, tmp_path, monkeypatch, index):
+    controller.store.save("work", [("pending", False), ("completed", True)])
+    path = _file(tmp_path, "work")
+    original = path.read_bytes()
+    save = Mock(wraps=controller.store.save)
+    monkeypatch.setattr(controller.store, "save", save)
+    error = IndexError if isinstance(index, int) else TypeError
+
+    with pytest.raises(error):
+        controller.toggle_item("work", index)
+
+    save.assert_not_called()
+    assert path.read_bytes() == original
 
 
 def test_remove_item_deletes_line_from_disk(controller, tmp_path):

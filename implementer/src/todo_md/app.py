@@ -215,11 +215,14 @@ class TodoController:
     def toggle_item(self, name: str, index: int) -> TodoItem:
         """Flip the done state of the item at ``index`` and persist it."""
 
-        def _mutate(todo_list: TodoList) -> None:
-            todo_list.toggle(index)
+        toggled = None
 
-        todo_list = self._load_and_save(name, _mutate)
-        return todo_list.items[index]
+        def _mutate(todo_list: TodoList) -> None:
+            nonlocal toggled
+            toggled = todo_list.toggle(index)
+
+        self._load_and_save(name, _mutate)
+        return toggled
 
     def remove_item(self, name: str, index: int) -> TodoItem:
         """Remove the item at ``index`` and persist the change."""
