@@ -23,6 +23,7 @@ from unittest.mock import patch
 import pytest
 
 from tests.conftest import managed_tk_roots
+from tests.test_gui_theme import _assert_input_caret_contrast
 from todo_md.app import TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
 
@@ -301,6 +302,62 @@ def test_settings_theme_palette_follows_startup_live_and_reopened_dialogs(make_a
     assert app.theme == theme
     assert app._settings_theme_var.get() == theme
     _assert_settings_theme_palette(app)
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("field", ["folder", "count"])
+def test_settings_caret_contrast_preserves_editing_and_reopens(make_app, tmp_path, theme, field):
+    app = make_app({"theme": theme})
+    _open(app)
+    win = app.settings_window
+    folder = win.winfo_children()[0].grid_slaves(row=1, column=0)[0]
+    entries = (folder, app._settings_spinbox)
+    for entry in entries:
+        _assert_input_caret_contrast(app, entry)
+
+    entry = folder if field == "folder" else app._settings_spinbox
+    entry.focus_force()
+    app.root.update()
+    value = str(tmp_path / "pending") if field == "folder" else "12"
+    entry.delete(0, "end")
+    entry.insert(0, value)
+    entry.icursor(1)
+    opposite = "dark" if theme == "light" else "light"
+    for expected_theme in (theme, opposite, theme):
+        if app.theme != expected_theme:
+            app._theme_btn.invoke()
+            app.root.update()
+        assert app.theme == expected_theme
+        assert app.settings_window is win
+        assert app.root.focus_get() is entry
+        assert entry.instate(["focus", "!disabled", "!readonly"])
+        assert entry.get() == value
+        assert entry.index("insert") == 1
+        for control in entries:
+            _assert_input_caret_contrast(app, control)
+        entry.event_generate("<KeyPress>", keysym="3")
+        app.root.update()
+        assert entry.get() == value[:1] + "3" + value[1:]
+        entry.event_generate("<KeyPress>", keysym="BackSpace")
+        app.root.update()
+        assert entry.get() == value
+
+    # Reopening after both open-dialog and closed-dialog switches uses current styles.
+    for switch_while_closed in (False, True):
+        app._settings_cancel_btn.invoke()
+        if switch_while_closed:
+            app._theme_btn.invoke()
+        _open(app)
+        assert app.settings_window is not win
+        folder = app.settings_window.winfo_children()[0].grid_slaves(row=1, column=0)[0]
+        assert folder.get() == app.controller.data_dir
+        assert app._settings_spinbox.get() == "10"
+        for control in (folder, app._settings_spinbox):
+            _assert_input_caret_contrast(app, control)
+            control.focus_force()
+            app.root.update()
+            assert app.root.focus_get() is control
+            _assert_input_caret_contrast(app, control)
 
 
 def test_settings_window_opens_once(make_app):

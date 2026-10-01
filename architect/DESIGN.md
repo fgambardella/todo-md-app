@@ -42,7 +42,7 @@ Paths below are relative to `implementer/src/`.
 - Application entry: `python -m todo_md` from `implementer/src/`; build/run/test instructions remain in the root `README.md`.
 - Persistence: UTF-8 Markdown checkbox files and `settings.json`; canonical formats are defined by `todo_md/storage.py` and `todo_md/settings.py`.
 - OS integration: macOS system-theme detection uses `defaults read -g AppleInterfaceStyle` with a light fallback; packaging uses native icon/ZIP tooling via the scripts above.
-- Tk compatibility: unsupported native appearance falls back to ttk clam with explicit palette colors for fields, sections, dialog backgrounds and interactive button/radio states. Native appearance remains untouched. Image labels use supported compound values. GUI tests must update each Tk root before destroying it.
+- Tk compatibility: unsupported native appearance falls back to ttk clam with explicit palette colors for entry/spinbox fields and carets, sections, dialog backgrounds and interactive button/radio states. Widget-level placeholder/text foregrounds follow live changes. Native appearance remains untouched. Image labels use supported compound values. GUI tests must update each Tk root before destroying it.
 - Installed version hooks affect every ordinary commit. Architect-only state commits use the user-approved command-scoped hook bypass; implementation commits retain normal hooks.
 
 ## Known Architectural Debt
