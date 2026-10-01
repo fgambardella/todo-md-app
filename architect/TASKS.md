@@ -17,7 +17,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 ## Current Implementation Summary
 
 - Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated item operations are persisted immediately.
-- The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions.
+- The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions. Main-window sizing keeps sidebar controls fully accessible.
 - Light/dark themes include readable controls, a theme-aware version badge, and custom dock/Finder icons.
 - Settings validate and save the full payload, apply theme and completed-item filtering live, and discard unsaved controls on window Cancel. Filtering never changes stored content.
 - Directory changes apply live with optional list movement and an explicit confirmation question; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, transfers reject filename collisions without overwriting, equivalent paths are harmless, and configuration stays fixed.
@@ -27,14 +27,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-### 38: Fully visible main Settings button (S)
-
-- Branch: `implementer/task-38-main-window-layout`; base/integration: `main`.
-- Scope: only main-window initial sizing/sidebar layout and regressions.
-- Acceptance: Settings and adjacent sidebar controls are fully visible and unclipped at initial opening in light/dark modes; normal resizing preserves access at the supported minimum. The existing visual structure and item area remain intact. Settings still opens normally.
-- Required tests: mapped widget geometry must cover requested button dimensions and remain inside ancestor/root bounds; test both palettes, initial geometry, and minimum supported resize. Do not only assert widget existence.
-- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_layout.py tests/test_gui_settings.py -v)`; `(cd src && .venv/bin/python -m pytest tests -v)`.
-- Complete Implementer prompt: Fix task 38 in `src/todo_md/app.py` and `src/tests/test_gui_layout.py` only (normal hook VERSION change allowed). Diagnose sidebar clipping caused by fixed initial geometry and requested widget sizes. Prefer a small content-aware sizing or layout correction over arbitrary enlarged constants; provide a safe minimum if required. Preserve all controls, style, bindings, and item behavior. Add isolated real-display geometry regressions in both themes that fail before the fix, including supported resizing and actual Settings invocation. Own/destroy test roots even on failure using existing harness patterns. Follow DESIGN Presentation and Tk compatibility constraints. Run both exact commands above. Do not fix settings-window geometry, styling, ordering, or cursors in this task.
+None.
 
 ## Queue
 
@@ -49,8 +42,8 @@ None.
 
 ## Recently Completed
 
+- 38: Main-window sidebar visibility; independently verified and approved; `ba7e7bbe4fc309c02ed23c099403c292e81256af`.
 - 37: Populated lists destinations and confirmation question; independently verified and approved; `b20176d08c7450398a1767e82b5bf5669fc6c62e`.
 - 36b2: GUI relocation and unattended test harness; independently verified and approved; `a0fc76918d5424334a1116176838013115eaed84`.
 - 36b1: Headless controller directory switching; verified and merged; `9612b3b`.
 - 36a: Headless lists-directory relocation; verified and merged; `f543275`.
-- 35b: Settings Save/Cancel; verified and merged; `9c45b49`.
