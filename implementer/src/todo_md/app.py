@@ -277,7 +277,6 @@ class TodoApp:
 
         self.root = tk.Tk()
         self.root.title("TODO Markdown App")
-        self.root.geometry("700x420")
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._dock_icon = None
@@ -299,6 +298,12 @@ class TodoApp:
         # Re-apply after the UI exists: the fallback palette must set
         # explicit backgrounds on items_frame/listbox once they are created.
         self._apply_theme(self.theme)
+        # Fit the fixed controls before loading items: long item text or list
+        # length must not dictate the window's initial or minimum dimensions.
+        self.root.update_idletasks()
+        width, height = self.root.winfo_reqwidth(), self.root.winfo_reqheight()
+        self.root.minsize(width, height)
+        self.root.geometry(f"{max(700, width)}x{max(420, height)}")
         self.refresh_lists(select_first=True)
 
     # -- construction -----------------------------------------------------
