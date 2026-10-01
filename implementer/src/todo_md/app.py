@@ -593,7 +593,6 @@ class TodoApp:
 
         win = tk.Toplevel(self.root)
         win.title("Settings")
-        win.geometry("420x280")
         win.transient(self.root)
         self.settings_window = win
 
@@ -649,7 +648,7 @@ class TodoApp:
 
         # (d) Save / Cancel ----------------------------------------------
         bottom = ttk.Frame(win, padding=(10, 8))
-        bottom.pack(fill=tk.X, side=tk.BOTTOM)
+        bottom.pack(side=tk.BOTTOM)
         self._settings_save_btn = ttk.Button(
             bottom, text="Save", command=self._settings_on_save
         )
@@ -660,6 +659,11 @@ class TodoApp:
         self._settings_cancel_btn.pack(side=tk.RIGHT)
 
         win.protocol("WM_DELETE_WINDOW", self._close_settings)
+        # Fit all controls using the current theme's font and widget metrics.
+        win.update_idletasks()
+        width, height = win.winfo_reqwidth(), win.winfo_reqheight()
+        win.minsize(width, height)
+        win.geometry(f"{max(420, width)}x{max(280, height)}")
         win.update()
 
     def _settings_browse(self, var) -> None:
