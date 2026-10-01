@@ -441,6 +441,15 @@ class TodoApp:
         style.theme_use("clam")
         style.configure("TFrame", background=bg, foreground=fg)
         style.configure("TLabel", background=bg, foreground=fg)
+        style.configure("TLabelframe", background=bg, foreground=fg)
+        style.configure("TLabelframe.Label", background=bg, foreground=fg)
+        style.configure("TRadiobutton", background=bg, foreground=fg)
+        # Keep radio labels on the section background even while interacting.
+        style.map(
+            "TRadiobutton",
+            background=[("active", bg), ("pressed", bg), ("selected", bg)],
+            foreground=[("active", fg), ("pressed", fg), ("selected", fg)],
+        )
         style.configure("TButton", background=btn_bg, foreground=fg)
         # Clam's default 'activeBackground' state stays light, so hovering a
         # button in dark mode flashes a light fill and hides the light text;
@@ -465,6 +474,8 @@ class TodoApp:
             fieldbackground=entry_bg,
         )
         self.root.config(bg=bg)
+        if self.settings_window is not None and self.settings_window.winfo_exists():
+            self.settings_window.config(bg=bg)
 
         # Plain tk widgets inherit the *parent's effective* background;
         # set it explicitly so the item rows and their labels flip.
@@ -592,6 +603,8 @@ class TodoApp:
             return
 
         win = tk.Toplevel(self.root)
+        if self._palette is not None:
+            win.configure(bg=self._palette["bg"])
         win.title("Settings")
         win.transient(self.root)
         self.settings_window = win
@@ -628,7 +641,7 @@ class TodoApp:
 
         # (b) theme radiobuttons ------------------------------------------
         theme_row = ttk.LabelFrame(win, text="Theme", padding=(10, 8))
-        theme_row.pack(fill=tk.X)
+        theme_row.pack(fill=tk.X, padx=10)
         self._settings_theme_rads = []
         for value, label in (("system", "System default"), ("light", "Light"), ("dark", "Dark")):
             rad = ttk.Radiobutton(

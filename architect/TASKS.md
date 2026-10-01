@@ -18,7 +18,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 - Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated item operations are persisted immediately.
 - The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions. Main-window sizing keeps sidebar controls fully accessible.
-- Light/dark themes include readable controls, a theme-aware version badge, and custom dock/Finder icons.
+- Light/dark themes include readable controls, a theme-aware version badge, and custom dock/Finder icons. Settings theme controls have consistent palette colors and symmetric margins, including during live theme changes.
 - Settings use fully visible, centered Save/Cancel actions, validate and save the full payload, apply theme and completed-item filtering live, and discard unsaved controls on window Cancel. Filtering never changes stored content.
 - Directory changes apply live with optional list movement and an explicit confirmation question; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, transfers reject filename collisions without overwriting, equivalent paths are harmless, and configuration stays fixed.
 - Relocation failures preserve recoverable files and refresh the active view. Failed settings persistence keeps the destination usable and supports retry without repeating completed moves; pending theme/filter edits remain unapplied.
@@ -27,14 +27,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-### 40: Settings Theme section appearance (S)
-
-- Branch: `implementer/task-40-settings-theme-style`; base/integration: `main`.
-- Scope: one focused Theme-section styling correction, including its surrounding horizontal margin.
-- Acceptance: section body, title and radio labels use the existing light/dark palette with readable text, including active/selected radio states. Both outer horizontal margins are nonzero and symmetric. Dialog margin background matches the surrounding palette. Existing/open/reopened dialogs follow live theme changes; native theme behavior and settings semantics remain intact.
-- Required tests: both palette values, relevant ttk state lookups, measured outer margins, open-dialog light/dark switching and reopening, plus existing geometry/behavior regressions.
-- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_gui_theme.py tests/test_gui_theme_switch.py -q)`; `(cd src && .venv/bin/python -m pytest tests -q)`.
-- Complete Implementer prompt: Fix task 40 in `src/todo_md/app.py` and `src/tests/test_gui_settings.py` only (normal hook VERSION change allowed). Use existing theme colors for the Settings Theme LabelFrame/title/radiobutton backgrounds and foregrounds, prevent default bright/tanned active fills, and add left/right outer margins consistent with adjacent content. Ensure the Toplevel background behind margins uses the same palette on opening and live theme changes. Preserve native theme fallback policy, radio selection, Save/Cancel semantics, content-aware geometry and centered actions. Add regression tests with existing isolated fixtures for startup and live/reopened theme transitions, active/selected styles, and real symmetric margins. Follow DESIGN Presentation/Tk constraints and run both exact commands. Do not change completion ordering or entry cursors yet.
+None.
 
 ## Queue
 
@@ -47,8 +40,8 @@ None.
 
 ## Recently Completed
 
+- 40: Settings Theme palette and margins; independently verified and approved; `9d785ef23b8b9778645936b5e7f42113a8ae9434`.
 - 39: Visible centered Settings actions; independently verified and approved; `7c69eb2413098f97ffa91d5e2507578c07aac669`.
 - 38: Main-window sidebar visibility; independently verified and approved; `ba7e7bbe4fc309c02ed23c099403c292e81256af`.
 - 37: Populated lists destinations and confirmation question; independently verified and approved; `b20176d08c7450398a1767e82b5bf5669fc6c62e`.
 - 36b2: GUI relocation and unattended test harness; independently verified and approved; `a0fc76918d5424334a1116176838013115eaed84`.
-- 36b1: Headless controller directory switching; verified and merged; `9612b3b`.

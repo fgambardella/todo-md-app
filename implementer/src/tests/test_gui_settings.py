@@ -235,6 +235,73 @@ def test_settings_controls_fit_and_actions_stay_centered(make_app, theme, size):
     window_midpoint = win.winfo_rootx() + win.winfo_width() / 2
     assert abs(group_midpoint - window_midpoint) <= 2
 
+    theme_row = app._settings_theme_rads[0].master
+    left_margin = theme_row.winfo_rootx() - win.winfo_rootx()
+    right_margin = win.winfo_width() - left_margin - theme_row.winfo_width()
+    assert left_margin == right_margin > 0
+    folder_label = win.winfo_children()[0].grid_slaves(row=0)[0]
+    completed_label = app._settings_spinbox.master.winfo_children()[0]
+    for label in (folder_label, completed_label):
+        assert label.winfo_rootx() - win.winfo_rootx() == left_margin
+
+
+def _assert_settings_theme_palette(app):
+    from tkinter import ttk
+
+    style = ttk.Style(app.root)
+    palette = app._palette
+    assert palette is not None
+    theme_row = app._settings_theme_rads[0].master
+    frame_style = theme_row.cget("style") or theme_row.winfo_class()
+    for name in (frame_style, f"{frame_style}.Label"):
+        assert style.lookup(name, "background") == palette["bg"]
+        assert style.lookup(name, "foreground") == palette["fg"]
+    assert app.settings_window.cget("background") == palette["bg"]
+    for radio in app._settings_theme_rads:
+        name = radio.cget("style") or radio.winfo_class()
+        for state in ((), ("active",), ("selected",), ("active", "selected"),
+                      ("pressed",), ("pressed", "selected")):
+            assert style.lookup(name, "background", state) == palette["bg"]
+            assert style.lookup(name, "foreground", state) == palette["fg"]
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_settings_theme_palette_follows_startup_live_and_reopened_dialogs(make_app, theme):
+    app = make_app({"theme": theme})
+    _open(app)
+    _assert_settings_theme_palette(app)
+
+    # Selecting a radio only edits the pending setting, not the live palette.
+    app._settings_theme_rads[0].invoke()
+    app.root.update()
+    assert app.theme == app.settings.theme == theme
+    assert app._settings_theme_var.get() == "system"
+    assert app._settings_theme_rads[0].instate(["selected"])
+    _assert_settings_theme_palette(app)
+
+    win = app.settings_window
+    app._theme_btn.invoke()
+    app.root.update()
+    assert app.theme == ("dark" if theme == "light" else "light")
+    assert app.settings_window is win
+    assert app._settings_theme_var.get() == "system"
+    assert app._settings_theme_rads[0].instate(["selected"])
+    _assert_settings_theme_palette(app)
+
+    app._settings_cancel_btn.invoke()
+    _open(app)
+    assert app.settings_window is not win
+    assert app._settings_theme_var.get() == app.settings.theme == app.theme
+    _assert_settings_theme_palette(app)
+
+    # A dialog opened after a closed-window theme change must also be current.
+    app._settings_cancel_btn.invoke()
+    app._theme_btn.invoke()
+    _open(app)
+    assert app.theme == theme
+    assert app._settings_theme_var.get() == theme
+    _assert_settings_theme_palette(app)
+
 
 def test_settings_window_opens_once(make_app):
     app = make_app()
