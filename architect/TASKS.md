@@ -20,22 +20,14 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions.
 - Light/dark themes include readable controls, a theme-aware version badge, and custom dock/Finder icons.
 - Settings validate and save the full payload, apply theme and completed-item filtering live, and discard unsaved controls on window Cancel. Filtering never changes stored content.
-- Directory changes apply live with optional list movement; popup Cancel retains the directory while saving other settings. Populated destinations are rejected, equivalent paths are harmless, and configuration stays fixed.
+- Directory changes apply live with optional list movement and an explicit confirmation question; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, transfers reject filename collisions without overwriting, equivalent paths are harmless, and configuration stays fixed.
 - Relocation failures preserve recoverable files and refresh the active view. Failed settings persistence keeps the destination usable and supports retry without repeating completed moves; pending theme/filter edits remain unapplied.
 - Automated GUI tests intercept unexpected dialogs and verify cleanup after failures without human interaction.
 - Build and release scripts produce a launch-tested Apple Silicon app bundle and versioned distributable ZIP.
 
 ## Active Task
 
-### 37: Populated lists destinations (M)
-
-- Branch: `implementer/task-37-populated-lists-dir`; base/integration: `main`.
-- Scope: allow populated destinations without overwriting any existing path; preserve existing optional transfer behavior. Complete sequential S micro-tasks: 37a headless collision policy, then 37b settings integration and explicit confirmation question. Merge only after both pass.
-- Status: ready for 37a; baseline full suite verified (219 passed, 2 gated skips).
-- Acceptance: switching without transfer accepts any populated directory and preserves both sides. Transfers accept unrelated destination lists, reject same-name target paths before moving any source, and retain exclusive creation against races. Filesystem failures preserve recoverability. Settings switch/persist/refresh correctly for Yes/No/Cancel, and the prompt ends with `Do you want to copy them in the new path?`. Existing unrelated behavior remains unchanged.
-- Required tests: storage/controller success and conflict cases, no-transfer same-name files, preflight conflicts later in sorted order, destination directories/symlinks, and existing copy/race/deletion-failure regressions. GUI coverage and full suite follow in 37b.
-- 37a command from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_storage.py tests/test_controller.py -v)`.
-- Complete current Implementer prompt: Implement only 37a. Edit `src/todo_md/storage.py`, `src/tests/test_storage.py`, and `src/tests/test_controller.py` (normal hook VERSION change allowed). Remove the blanket populated-directory rejection. Without transfer, leave all existing files alone and permit switching. With transfer, enumerate source Markdown files, reject any existing same-name destination path before moving anything (including directories and dangling symlinks), and preserve exclusive creation and current partial-I/O-failure behavior. Do not change move-versus-copy semantics or the storage format. Update contradictory storage/controller tests and cover non-conflicting populated targets, same-name conflicts, and no-transfer switching with colliding names. Preserve all failure/race tests. Follow DESIGN Component Architecture and Data Models and Flow; this task replaces the old blanket rejection policy. Run the exact targeted command above. Existing GUI rejection tests are deliberately updated by 37b before the task is merged; do not edit GUI files in this micro-task.
+None.
 
 ## Queue
 
@@ -51,6 +43,7 @@ None.
 
 ## Recently Completed
 
+- 37: Populated lists destinations and confirmation question; independently verified and approved; `b20176d08c7450398a1767e82b5bf5669fc6c62e`.
 - 36b2: GUI relocation and unattended test harness; independently verified and approved; `a0fc76918d5424334a1116176838013115eaed84`.
 - 36b1: Headless controller directory switching; verified and merged; `9612b3b`.
 - 36a: Headless lists-directory relocation; verified and merged; `f543275`.

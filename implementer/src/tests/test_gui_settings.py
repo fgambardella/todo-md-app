@@ -110,6 +110,7 @@ def _message(old, new) -> str:
     return (
         "You are about to change the directory where your lists are stored "
         f"from '{old}' to '{new}' but there are already lists in it."
+        " Do you want to copy them in the new path?"
     )
 
 
@@ -384,41 +385,61 @@ def test_invalid_dir_empty_source_shows_error_keeps_open_persists_nothing(make_a
     assert app.settings.lists_dir is None
 
 
-def test_yes_moves_to_target_with_exact_prompt(make_app, tmp_path):
+@pytest.mark.parametrize("target_name", ["target", "default_lists"])
+@pytest.mark.parametrize("populated", [False, True])
+def test_yes_moves_to_target_with_exact_prompt(make_app, tmp_path, target_name, populated):
     source = _make_source(tmp_path)
     (tmp_path / "source" / "archive.md").write_bytes(b"# archive\n- [x] earlier\n")
-    target = str(tmp_path / "target")
-    app = make_app(data_dir=source)
+    target_path = tmp_path / target_name
+    target = str(target_path)
+    saved_target = None if target_name == "default_lists" else target
+    existing = b"# existing\n\n- [ ] destination task\nretained formatting\n"
+    if populated:
+        target_path.mkdir()
+        (target_path / "existing.md").write_bytes(existing)
+    app = make_app({"lists_dir": source})
     _select_in_ui(app, "work")
     _assert_view(app, ["archive", "work"], "work", [("task", False)])
     _open(app)
-    app._settings_lists_dir_var.set(target)
+    app._settings_lists_dir_var.set("" if saved_target is None else target)
     ask, err = _save(app, True)
 
     ask.assert_called_once()
     assert ask.call_args.args == ("Confirm directory change", _message(source, target))
     err.assert_not_called()
-    assert _payload(tmp_path)["lists_dir"] == target
-    assert app.settings.lists_dir == target
+    assert _payload(tmp_path) == {
+        "theme": "system", "lists_dir": saved_target, "completed_visible": 10
+    }
+    assert app.settings.lists_dir == saved_target
     assert app.settings_window is None
     assert not os.path.exists(os.path.join(source, "work.md"))
-    assert (tmp_path / "target" / "work.md").read_bytes() == MD
+    assert (target_path / "work.md").read_bytes() == MD
     assert app.controller.store.data_dir == target
-    assert app.controller.list_names() == ["archive", "work"]
+    names = ["archive", "existing", "work"] if populated else ["archive", "work"]
+    assert app.controller.list_names() == names
     assert app.data_dir == app.controller.data_dir == target
-    _assert_view(app, ["archive", "work"], "work", [("task", False)])
-    assert (tmp_path / "target" / "archive.md").read_bytes() == b"# archive\n- [x] earlier\n"
+    _assert_view(app, names, "work", [("task", False)])
+    assert (target_path / "archive.md").read_bytes() == b"# archive\n- [x] earlier\n"
+    if populated:
+        assert (target_path / "existing.md").read_bytes() == existing
+        _select_in_ui(app, "existing")
+        _assert_view(app, names, "existing", [("destination task", False)])
+        _select_in_ui(app, "work")
 
     # Real widget callbacks must edit the destination, not recreate source files.
     app._item_rows[0][1].invoke()
     app.root.update()
-    _assert_view(app, ["archive", "work"], "work", [("task", True)])
-    assert (tmp_path / "target" / "work.md").read_bytes() == b"# work\n- [x] task\n"
+    _assert_view(app, names, "work", [("task", True)])
+    assert (target_path / "work.md").read_bytes() == b"# work\n- [x] task\n"
     _submit_entry(app, app.new_name_entry, "new")
     _submit_entry(app, app.new_item_entry, "task")
-    _assert_view(app, ["archive", "new", "work"], "new", [("task", False)])
-    assert (tmp_path / "target" / "new.md").read_bytes() == b"# new\n- [ ] task\n"
+    _assert_view(app, sorted(names + ["new"]), "new", [("task", False)])
+    assert (target_path / "new.md").read_bytes() == b"# new\n- [ ] task\n"
+    if populated:
+        assert (target_path / "existing.md").read_bytes() == existing
     assert os.listdir(source) == []
+    _open(app)
+    assert app._settings_lists_dir_var.get() == target
 
 
 def test_no_switches_without_moving(make_app, tmp_path):
@@ -489,47 +510,143 @@ def test_whitespace_entry_no_switches_to_default_without_moving(make_app, tmp_pa
     assert os.listdir(default_dir) == []
 
 
-@pytest.mark.parametrize("decision", [True, False])
-def test_populated_default_rejected_for_yes_and_no(make_app, tmp_path, default_dir, decision):
+@pytest.mark.parametrize("target_name", ["target", "default_lists"])
+def test_no_switches_to_populated_target_preserving_same_name_lists(
+    make_app, tmp_path, target_name
+):
     source = _make_source(tmp_path)
-    os.makedirs(default_dir)
-    with open(os.path.join(default_dir, "existing.md"), "wb") as fh:
-        fh.write(b"# existing\n- [ ] item\n")
+    target = tmp_path / target_name
+    target.mkdir()
+    destination_work = b"# work\n\n- [x] destination task\nretained formatting\n"
+    existing = b"# existing\n- [ ] item\n"
+    (target / "work.md").write_bytes(destination_work)
+    (target / "existing.md").write_bytes(existing)
+    saved_target = None if target_name == "default_lists" else str(target)
     app = make_app({"lists_dir": source})
-    before = (tmp_path / "config" / "settings.json").read_bytes()
-    store_before = app.controller.store
+    _assert_view(app, ["work"], "work", [("task", False)])
+    old_widgets = app._item_rows[0][1:]
     _open(app)
-    app._settings_lists_dir_var.set("")
-    ask, err = _save(app, decision)
+    app._settings_lists_dir_var.set("" if saved_target is None else str(target))
+    ask, err = _save(app, False)
 
     ask.assert_called_once()
+    assert ask.call_args.args == ("Confirm directory change", _message(source, target))
+    err.assert_not_called()
+    assert app.settings_window is None
+    assert _payload(tmp_path) == {
+        "theme": "system", "lists_dir": saved_target, "completed_visible": 10
+    }
+    assert app.settings.lists_dir == saved_target
+    assert app.data_dir == app.controller.data_dir == app.controller.store.data_dir == str(target)
+    assert (tmp_path / "source" / "work.md").read_bytes() == MD
+    assert (target / "work.md").read_bytes() == destination_work
+    assert (target / "existing.md").read_bytes() == existing
+    _assert_view(app, ["existing", "work"], "work", [("destination task", True)])
+    assert all(not widget.winfo_exists() for widget in old_widgets)
+
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    _submit_entry(app, app.new_item_entry, "destination edit")
+    _assert_view(app, ["existing", "work"], "work", [
+        ("destination task", False), ("destination edit", False)
+    ])
+    assert (target / "work.md").read_bytes() == (
+        b"# work\n- [ ] destination task\n- [ ] destination edit\n"
+    )
+    assert (target / "existing.md").read_bytes() == existing
+    assert (tmp_path / "source" / "work.md").read_bytes() == MD
+    assert os.listdir(source) == ["work.md"]
+    _open(app)
+    assert app._settings_lists_dir_var.get() == str(target)
+
+
+@pytest.mark.parametrize("target_name", ["target", "default_lists"])
+def test_yes_collision_preserves_all_files_settings_bindings_and_view(
+    make_app, tmp_path, target_name
+):
+    source = _make_source(tmp_path)
+    ahead = b"# ahead\n- [ ] must not move before detecting work collision\n"
+    (tmp_path / "source" / "ahead.md").write_bytes(ahead)
+    target = tmp_path / target_name
+    target.mkdir()
+    destination_work = b"# work\n- [x] destination task\n"
+    existing = b"# existing\n- [ ] item\n"
+    (target / "work.md").write_bytes(destination_work)
+    (target / "existing.md").write_bytes(existing)
+    app = make_app({"theme": "light", "lists_dir": source, "completed_visible": 10})
+    before = (tmp_path / "config" / "settings.json").read_bytes()
+    store_before = app.controller.store
+    _select_in_ui(app, "work")
+    _open(app)
+    app._settings_lists_dir_var.set("" if target_name == "default_lists" else str(target))
+    app._settings_theme_var.set("dark")
+    app._settings_completed_var.set(0)
+    ask, err = _save(app, True)
+
+    ask.assert_called_once()
+    assert ask.call_args.args == ("Confirm directory change", _message(source, target))
     err.assert_called_once()
-    assert "destination" in " ".join(str(a) for a in err.call_args.args)
+    for text in (source, str(target / "work.md"), "destination already exists"):
+        assert text in err.call_args.args[1]
     assert app.settings_window is not None and app.settings_window.winfo_exists()
     assert (tmp_path / "config" / "settings.json").read_bytes() == before
     assert app.controller.store is store_before
-    assert app.controller.store.data_dir == source
-    assert (tmp_path / "source" / "work.md").read_bytes() == MD
-    assert os.listdir(default_dir) == ["existing.md"]
+    assert app.data_dir == app.controller.data_dir == app.controller.store.data_dir == source
     assert app.settings.lists_dir == source
+    assert app.settings.theme == app.theme == "light"
+    assert app.settings.completed_visible == 10
+    assert sorted(os.listdir(source)) == ["ahead.md", "work.md"]
+    assert sorted(os.listdir(target)) == ["existing.md", "work.md"]
+    assert (tmp_path / "source" / "ahead.md").read_bytes() == ahead
+    assert (tmp_path / "source" / "work.md").read_bytes() == MD
+    assert (target / "existing.md").read_bytes() == existing
+    assert (target / "work.md").read_bytes() == destination_work
+    _assert_view(app, ["ahead", "work"], "work", [("task", False)])
+
+    app._item_rows[0][1].invoke()
+    app.root.update()
+    _assert_view(app, ["ahead", "work"], "work", [("task", True)])
+    assert (tmp_path / "source" / "work.md").read_bytes() == b"# work\n- [x] task\n"
+    assert (tmp_path / "source" / "ahead.md").read_bytes() == ahead
+    assert (target / "work.md").read_bytes() == destination_work
+    assert (target / "existing.md").read_bytes() == existing
+    assert (tmp_path / "config" / "settings.json").read_bytes() == before
 
 
-def test_populated_target_rejected_when_source_empty_without_prompt(make_app, tmp_path):
+@pytest.mark.parametrize("target_name", ["target", "default_lists"])
+def test_empty_source_switches_to_populated_target_without_prompt(make_app, tmp_path, target_name):
     source = tmp_path / "source"
     source.mkdir()
-    target = tmp_path / "target"
+    target = tmp_path / target_name
     target.mkdir()
-    (target / "existing.md").write_bytes(b"# existing\n")
-    app = make_app(data_dir=str(source))
+    existing = b"# existing\n- [ ] destination task\n"
+    (target / "existing.md").write_bytes(existing)
+    saved_target = None if target_name == "default_lists" else str(target)
+    app = make_app({"lists_dir": str(source)})
     _open(app)
-    app._settings_lists_dir_var.set(str(target))
+    app._settings_lists_dir_var.set("" if saved_target is None else str(target))
     _, err = _save(app)
 
-    err.assert_called_once()
-    assert "destination" in " ".join(str(a) for a in err.call_args.args)
-    assert app.settings_window is not None
-    assert _no_settings_file(tmp_path)
-    assert app.controller.store.data_dir == str(source)
+    err.assert_not_called()
+    assert app.settings_window is None
+    assert _payload(tmp_path) == {
+        "theme": "system", "lists_dir": saved_target, "completed_visible": 10
+    }
+    assert app.settings.lists_dir == saved_target
+    assert app.data_dir == app.controller.data_dir == app.controller.store.data_dir == str(target)
+    assert (target / "existing.md").read_bytes() == existing
+    assert os.listdir(source) == []
+    _assert_view(app, ["existing"], None, [])
+    _select_in_ui(app, "existing")
+    _assert_view(app, ["existing"], "existing", [("destination task", False)])
+    _submit_entry(app, app.new_item_entry, "destination edit")
+    _assert_view(app, ["existing"], "existing", [
+        ("destination task", False), ("destination edit", False)
+    ])
+    assert (target / "existing.md").read_bytes() == (
+        b"# existing\n- [ ] destination task\n- [ ] destination edit\n"
+    )
+    assert os.listdir(source) == []
 
 
 def test_cancel_from_default_preserves_null_and_applies_other_edits(

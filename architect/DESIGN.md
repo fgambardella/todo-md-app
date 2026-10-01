@@ -28,7 +28,7 @@ Paths below are relative to `implementer/src/`.
 
 - Domain ownership and fields are canonical in `todo_md/models.py`; storage maps each list to `<Name>.md`. GUI-only filtering never changes persisted items.
 - GUI actions flow through controller to storage; list mutations are re-read for rendering. Storage writes use temporary files and replacement to avoid partial individual files.
-- Relocation creates the destination and optionally transfers top-level Markdown files verbatim. Destination validation and exclusive file creation prevent overwrites; source deletion follows a completed copy, including across filesystems. Non-Markdown content remains in place.
+- Relocation creates the destination and optionally transfers top-level Markdown files verbatim. Populated destinations are allowed; transfers preflight every source filename against existing destination paths, and exclusive creation prevents racing overwrites. Source deletion follows a completed copy, including across filesystems. Non-Markdown content remains in place.
 - Controller switching uses the bound store directory as its source of truth and replaces both bindings only after success. Equivalent paths are no-ops; errors retain the original bindings. Settings persistence remains the caller's responsibility.
 - Settings schema and validation are canonical in `todo_md/settings.py`. A null lists directory means the application default; legacy theme-only files load compatibly. Configuration never moves with lists.
 - Startup resolves the lists directory from saved settings, creates it on demand, and supplies it to storage/controller. System theme is detected live, never persisted as a resolved choice.

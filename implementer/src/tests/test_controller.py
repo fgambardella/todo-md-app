@@ -89,7 +89,11 @@ def test_data_dir_explicit_override_wins(tmp_path):
     assert controller.data_dir != store.data_dir
 
 
-def test_change_lists_dir_moves_contents_and_future_writes(controller, tmp_path):
+@pytest.mark.parametrize("populated_target", [True, False])
+def test_change_lists_dir_moves_contents_and_future_writes(
+    controller, tmp_path, populated_target
+):
+    original_store = controller.store
     source = controller.store.data_dir
     target = tmp_path / "nested" / "lists"
     contents = {
@@ -99,11 +103,21 @@ def test_change_lists_dir_moves_contents_and_future_writes(controller, tmp_path)
     for name, content in contents.items():
         (source / name).write_bytes(content)
     (source / "notes.txt").write_bytes(b"leave here")
+    target_contents = {}
+    if populated_target:
+        target.mkdir(parents=True)
+        target_contents = {"existing.md": b"# Existing\r\n- [x] target task\r\n"}
+        for name, content in target_contents.items():
+            (target / name).write_bytes(content)
 
     controller.change_lists_dir(target, move=True)
 
+    assert controller.store is not original_store
+    assert original_store.data_dir == source
     assert controller.data_dir == controller.store.data_dir == target
-    assert controller.list_names() == ["other", "work"]
+    assert controller.list_names() == sorted(
+        name[:-3] for name in contents | target_contents
+    )
     for name, content in contents.items():
         assert (target / name).read_bytes() == content
         assert not (source / name).exists()
@@ -116,6 +130,8 @@ def test_change_lists_dir_moves_contents_and_future_writes(controller, tmp_path)
 
     assert (target / "work.md").read_bytes() == b"# work\n- [x] task one\n- [ ] task two\n"
     assert (target / "other.md").read_bytes() == contents["other.md"]
+    for name, content in target_contents.items():
+        assert (target / name).read_bytes() == content
     assert {p.name: p.read_bytes() for p in source.iterdir()} == {"notes.txt": b"leave here"}
 
 
@@ -139,8 +155,10 @@ def test_change_lists_dir_without_move_uses_empty_destination(controller, tmp_pa
     assert controller.list_names() == ["work"]
 
 
-@pytest.mark.parametrize("move", [True, False])
-def test_change_lists_dir_populated_target_keeps_bindings(controller, tmp_path, move):
+@pytest.mark.parametrize("existing_name", ["work.md", "existing.md"])
+def test_change_lists_dir_without_move_uses_populated_target(
+    controller, tmp_path, existing_name
+):
     original_store = controller.store
     original_dir = controller.data_dir
     original = b"# work\r\n- [ ] source task\r\n"
@@ -148,16 +166,42 @@ def test_change_lists_dir_populated_target_keeps_bindings(controller, tmp_path, 
     target = tmp_path / "target"
     target.mkdir()
     existing = b"# Existing\r\n- [x] target task\r\n"
-    (target / "existing.md").write_bytes(existing)
+    (target / existing_name).write_bytes(existing)
 
-    with pytest.raises(FileExistsError, match="destination already contains Markdown"):
-        controller.change_lists_dir(target, move=move)
+    controller.change_lists_dir(target, move=False)
+
+    assert controller.store is not original_store
+    assert original_store.data_dir == original_dir
+    assert controller.data_dir == controller.store.data_dir == target
+    assert controller.list_names() == [existing_name[:-3]]
+    items = controller.open_list(existing_name[:-3]).items
+    assert [(item.text, item.done) for item in items] == [("target task", True)]
+    assert {p.name: p.read_bytes() for p in original_dir.iterdir()} == {"work.md": original}
+    assert {p.name: p.read_bytes() for p in target.iterdir()} == {existing_name: existing}
+
+
+def test_change_lists_dir_transfer_conflict_keeps_bindings(controller, tmp_path):
+    original_store = controller.store
+    original_dir = controller.data_dir
+    source_contents = {
+        "first.md": b"# First\n- [ ] first task\n",
+        "work.md": b"# work\r\n- [ ] source task\r\n",
+    }
+    for name, content in source_contents.items():
+        (original_dir / name).write_bytes(content)
+    target = tmp_path / "target"
+    target.mkdir()
+    existing = b"# Existing\r\n- [x] target task\r\n"
+    (target / "work.md").write_bytes(existing)
+
+    with pytest.raises(FileExistsError):
+        controller.change_lists_dir(target, move=True)
 
     assert controller.store is original_store
     assert controller.data_dir == controller.store.data_dir == original_dir
-    assert controller.list_names() == ["work"]
-    assert {p.name: p.read_bytes() for p in original_dir.iterdir()} == {"work.md": original}
-    assert {p.name: p.read_bytes() for p in target.iterdir()} == {"existing.md": existing}
+    assert controller.list_names() == ["first", "work"]
+    assert {p.name: p.read_bytes() for p in original_dir.iterdir()} == source_contents
+    assert {p.name: p.read_bytes() for p in target.iterdir()} == {"work.md": existing}
 
 
 @pytest.mark.parametrize("move", [True, False])

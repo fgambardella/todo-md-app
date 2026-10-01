@@ -16,15 +16,13 @@ _BAD_NAME_RE = re.compile(r"[^A-Za-z0-9_-]")
 def relocate_lists(old_dir, new_dir, move: bool) -> None:
     """Create new_dir and optionally move top-level .md files there verbatim.
 
-    A destination containing Markdown files raises FileExistsError in either
-    mode. Moves never overwrite files, including ones created after validation.
-    On failure, already moved files stay in new_dir; the failing source remains
+    Without moves, existing files are untouched. Before moving, any same-name
+    destination path (including a dangling symlink) raises FileExistsError.
+    Moves never overwrite files, including ones created after validation. On I/O
+    failure, already moved files stay in new_dir; the failing source remains
     intact, possibly with a complete copy if deleting the source failed.
     """
     os.makedirs(new_dir, exist_ok=True)
-    with os.scandir(new_dir) as entries:
-        if any(entry.name.endswith(".md") and entry.is_file() for entry in entries):
-            raise FileExistsError(f"destination already contains Markdown files: {new_dir}")
     if not move:
         return
 
@@ -37,6 +35,11 @@ def relocate_lists(old_dir, new_dir, move: bool) -> None:
             )
     except FileNotFoundError:
         return
+
+    for source in sources:
+        target = os.path.join(new_dir, os.path.basename(source))
+        if os.path.lexists(target):
+            raise FileExistsError(f"destination already exists: {target}")
 
     for source in sources:
         target = os.path.join(new_dir, os.path.basename(source))
