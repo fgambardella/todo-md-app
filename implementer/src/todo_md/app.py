@@ -783,6 +783,7 @@ class TodoApp:
             prompt = (
                 "You are about to change the directory where your lists are stored "
                 f"from '{old_dir}' to '{target}' but there are already lists in it."
+                " Do you want to copy them in the new path?"
             )
             answer = messagebox.askyesnocancel("Confirm directory change", prompt)
             if answer is None:  # Cancel: keep active directory, abandon target.
