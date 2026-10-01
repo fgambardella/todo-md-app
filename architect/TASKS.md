@@ -27,11 +27,18 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 41: Completion-ordered items (M)
+
+- Branch: `implementer/task-41-completion-order`; base/integration: `main`.
+- Scope: sequential S micro-tasks 41a persisted toggle ordering and controller return contract; 41b display/filter ordering and GUI callbacks. Merge only after both pass.
+- Status: ready for 41a.
+- Acceptance: completed items precede incomplete items, oldest completion first. The newest configured count remains visible; completing another hides only the oldest visible completed item at capacity. No filtering deletes data. Completion order survives reload using Markdown row order without metadata/schema changes. Legacy completed rows use existing relative order. Undo returns an item to the front of the incomplete group; re-completion is newest. Unaffected incomplete items preserve relative order; toggle/delete target original stored indexes even with hidden/reordered/duplicate rows.
+- Required 41a tests: out-of-order completions, unchanged relative order, undo/re-completion, equal duplicate identity, negative/invalid indexes, exact persisted Markdown and fresh-controller reload, correct toggle return value. Display/GUI tests follow in 41b.
+- Command from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_models.py tests/test_controller.py tests/test_storage.py tests/test_gui_headless.py -q)`.
+- Complete current Implementer prompt: Implement only 41a in `src/todo_md/models.py`, the controller portion of `src/todo_md/app.py`, `src/tests/test_models.py`, and `src/tests/test_controller.py` (normal hook VERSION change allowed). On toggle, remove the selected item by index, preserve other completed/incomplete relative order, and insert the toggled item at their group boundary: after existing completed items if now done, or before remaining incomplete items if undone. Persist that order through the existing Markdown format; no timestamps, sidecars, new fields or load-time writes. Ensure controller toggle returns the actual toggled object rather than the item now at its former index. Cover all 41a criteria with headless regressions, including duplicate-equal objects and reload. Preserve exceptions and negative indexing. Follow DESIGN Domain/Controller and Data Models and Flow; this task intentionally changes the previous toggle-keeps-position behavior. Run the exact command. Do not change visible_items or GUI rendering/tests yet; their old ordering assertions are updated in 41b before integration.
 
 ## Queue
 
-- 41: Completed items must appear above incomplete items in completion order (oldest first); completing another item should evict only the oldest visible completed item when the configured limit is exceeded.
 - 42: Input-field insertion cursors must remain visible in light mode.
 
 ## Active Blockers
