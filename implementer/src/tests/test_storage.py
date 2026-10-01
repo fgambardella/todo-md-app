@@ -150,7 +150,10 @@ def test_atomic_replace_no_partial_content(store, tmp_path):
     assert leftovers == []
 
 
-def test_relocate_moves_exact_bytes_and_preserves_other_content(tmp_path):
+@pytest.mark.parametrize("populated_target", [True, False])
+def test_relocate_moves_exact_bytes_and_preserves_other_content(
+    tmp_path, populated_target
+):
     source = tmp_path / "source"
     target = tmp_path / "target"
     source.mkdir()
@@ -166,7 +169,11 @@ def test_relocate_moves_exact_bytes_and_preserves_other_content(tmp_path):
     (source / "nested.md").mkdir()
     nested = source / "nested.md" / "child.md"
     nested.write_bytes(b"nested list")
-    (target / "notes.txt").write_bytes(b"keep target notes")
+    target_contents = {"notes.txt": b"keep target notes"}
+    if populated_target:
+        target_contents["existing.md"] = b"# Existing\r\n- [x] keep this list\r\n"
+    for name, content in target_contents.items():
+        (target / name).write_bytes(content)
 
     relocate_lists(source, target, move=True)
 
@@ -176,8 +183,9 @@ def test_relocate_moves_exact_bytes_and_preserves_other_content(tmp_path):
     assert {p.name for p in source.iterdir()} == {"settings.json", "nested.md"}
     assert (source / "settings.json").read_bytes() == b'{"untouched": true}\n'
     assert nested.read_bytes() == b"nested list"
-    assert {p.name for p in target.iterdir()} == set(contents) | {"notes.txt"}
-    assert (target / "notes.txt").read_bytes() == b"keep target notes"
+    assert {p.name for p in target.iterdir()} == set(contents) | set(target_contents)
+    for name, content in target_contents.items():
+        assert (target / name).read_bytes() == content
 
 
 def test_relocate_without_move_leaves_source_unchanged(tmp_path):
@@ -195,9 +203,8 @@ def test_relocate_without_move_leaves_source_unchanged(tmp_path):
     assert {p.name: p.read_bytes() for p in source.iterdir()} == contents
 
 
-@pytest.mark.parametrize("move", [True, False])
 @pytest.mark.parametrize("existing_name", ["tasks.md", "different.md"])
-def test_relocate_rejects_populated_target_without_changes(tmp_path, move, existing_name):
+def test_relocate_without_move_preserves_populated_target(tmp_path, existing_name):
     source = tmp_path / "source"
     target = tmp_path / "target"
     source.mkdir()
@@ -209,25 +216,75 @@ def test_relocate_rejects_populated_target_without_changes(tmp_path, move, exist
     for name, content in target_contents.items():
         (target / name).write_bytes(content)
 
-    with pytest.raises(FileExistsError, match="destination already contains Markdown"):
-        relocate_lists(source, target, move=move)
+    relocate_lists(source, target, move=False)
 
     assert {p.name: p.read_bytes() for p in source.iterdir()} == source_contents
     assert {p.name: p.read_bytes() for p in target.iterdir()} == target_contents
 
 
+@pytest.mark.parametrize(
+    "target_kind", ["file", "directory", "symlink", "dangling_symlink"]
+)
+def test_relocate_preflights_later_conflict_before_any_transfer(tmp_path, target_kind):
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    source.mkdir()
+    target.mkdir()
+    source_contents = {"first.md": b"first\r\n", "tasks.md": b"source\xff"}
+    for name, content in source_contents.items():
+        (source / name).write_bytes(content)
+    (target / "notes.txt").write_bytes(b"target notes")
+    conflict = target / "tasks.md"
+    existing = b"existing\x00\r\n"
+    referent = tmp_path / "referent"
+    if target_kind == "file":
+        conflict.write_bytes(existing)
+    elif target_kind == "directory":
+        conflict.mkdir()
+        (conflict / "child.md").write_bytes(existing)
+    else:
+        if target_kind == "symlink":
+            referent.write_bytes(existing)
+        conflict.symlink_to(referent)
+
+    with pytest.raises(FileExistsError):
+        relocate_lists(source, target, move=True)
+
+    assert {p.name: p.read_bytes() for p in source.iterdir()} == source_contents
+    assert {p.name for p in target.iterdir()} == {"tasks.md", "notes.txt"}
+    assert (target / "notes.txt").read_bytes() == b"target notes"
+    if target_kind == "file":
+        assert conflict.read_bytes() == existing
+    elif target_kind == "directory":
+        assert {p.name: p.read_bytes() for p in conflict.iterdir()} == {"child.md": existing}
+    else:
+        assert conflict.is_symlink()
+        assert conflict.readlink() == referent
+        if target_kind == "symlink":
+            assert referent.read_bytes() == existing
+        else:
+            assert not referent.exists()
+
+
 @pytest.mark.parametrize("move", [True, False])
 @pytest.mark.parametrize("source_exists", [True, False])
-def test_relocate_empty_or_missing_source_creates_parents(tmp_path, move, source_exists):
+@pytest.mark.parametrize("populated_target", [True, False])
+def test_relocate_empty_or_missing_source_preserves_target(
+    tmp_path, move, source_exists, populated_target
+):
     source = tmp_path / "source"
     if source_exists:
         source.mkdir()
     target = tmp_path / "one" / "two" / "target"
+    target_contents = {"existing.md": b"existing list"} if populated_target else {}
+    if populated_target:
+        target.mkdir(parents=True)
+        (target / "existing.md").write_bytes(target_contents["existing.md"])
 
     relocate_lists(source, target, move=move)
 
     assert target.is_dir()
-    assert list(target.iterdir()) == []
+    assert {p.name: p.read_bytes() for p in target.iterdir()} == target_contents
     assert source.exists() == source_exists
     if source_exists:
         assert list(source.iterdir()) == []
