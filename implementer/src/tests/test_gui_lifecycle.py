@@ -3,6 +3,59 @@
 import pytest
 
 
+def test_long_label_fixture_never_maps_and_cleans_up_after_failure(isolated_pytest):
+    result = isolated_pytest('''
+        import tkinter as tk
+        import pytest
+        from tests import test_gui_layout as layout
+        from tests.test_gui_layout import make_app
+
+        verified_cleanups = 0
+
+        @pytest.fixture
+        def audit(monkeypatch):
+            owned = []
+            mapped = []
+            original_init = tk.Tk.__init__
+
+            def track(root, *args, **kwargs):
+                original_init(root, *args, **kwargs)
+                owned.append(root)
+                def record_map(event):
+                    if event.widget is root:
+                        mapped.append(root)
+                root.bind("<Map>", record_map, add="+")
+
+            monkeypatch.setattr(tk.Tk, "__init__", track)
+            yield owned
+            assert len(owned) == 1
+            with pytest.raises(tk.TclError, match="application has been destroyed"):
+                owned[0].winfo_exists()
+            # Includes construction's idle update and the teardown update.
+            assert mapped == [], "structural long-label root was mapped"
+            assert tk._default_root is None
+            global verified_cleanups
+            verified_cleanups += 1
+
+        @pytest.mark.parametrize("fail_body", [False, True])
+        def test_long_label(audit, make_app, fail_body):
+            # Exercise the actual regression with the complete LONG_TEXT.
+            layout.test_item_label_layout(make_app)
+            assert audit[0].state() == "withdrawn"
+            assert not audit[0].winfo_ismapped()
+            if fail_body:
+                raise RuntimeError("injected long-label body failure")
+
+        def test_after_cleanup(dialog_guard):
+            assert verified_cleanups == 2
+            assert tk._default_root is None
+            assert dialog_guard.attempts == []
+    ''')
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+    result.assert_outcomes(passed=2, failed=1)
+    result.stdout.fnmatch_lines(["*RuntimeError: injected long-label body failure*"])
+
+
 @pytest.mark.parametrize(
     "failure,root_count,phase",
     [

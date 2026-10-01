@@ -21,13 +21,20 @@ LONG_TEXT = (
 def make_app(tmp_path):
     callback_errors = []
 
-    def build(theme="light", item_text="task"):
+    def build(theme="light", item_text="task", *, mapped=True):
+        def create_app_root():
+            root = create_root()
+            if not mapped:
+                # TodoApp updates idle tasks during construction, so withdraw now.
+                root.withdraw()
+            return root
+
         config_dir = str(tmp_path / "config")
         save_settings(config_dir, Settings(theme=theme))
         controller = TodoController(MarkdownListStore(tmp_path / "lists"))
         controller.create_list("work")
         controller.add_item("work", item_text)
-        with patch("tkinter.Tk", create_root):
+        with patch("tkinter.Tk", create_app_root):
             app = TodoApp(controller, config_dir=config_dir)
         app.root.report_callback_exception = (
             lambda exc, val, tb: callback_errors.append(val)
@@ -116,9 +123,10 @@ def test_main_window_controls_fit_and_settings_opens(make_app, theme, size):
 
 
 def test_item_label_layout(make_app):
+    """Check full text and packing metadata without presenting a native window."""
     assert len(LONG_TEXT) >= 120, "test text must be 120+ chars"
 
-    app = make_app(item_text=LONG_TEXT)
+    app = make_app(item_text=LONG_TEXT, mapped=False)
     assert app._item_rows, "expected at least one item row"
     _var, checkbutton, label, _del = app._item_rows[0]
 
@@ -130,7 +138,7 @@ def test_item_label_layout(make_app):
     assert "x" in info.get("fill", "")
     assert info.get("expand") == 1
 
-    # No truncation: full 120+ char text visible
+    # No truncation in the label's text: retain the complete 120+ char value.
     assert label.cget("text") == LONG_TEXT
 
     # Checkbutton packed left with modest padding
