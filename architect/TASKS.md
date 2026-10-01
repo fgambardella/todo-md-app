@@ -27,11 +27,17 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 38: Fully visible main Settings button (S)
+
+- Branch: `implementer/task-38-main-window-layout`; base/integration: `main`.
+- Scope: only main-window initial sizing/sidebar layout and regressions.
+- Acceptance: Settings and adjacent sidebar controls are fully visible and unclipped at initial opening in light/dark modes; normal resizing preserves access at the supported minimum. The existing visual structure and item area remain intact. Settings still opens normally.
+- Required tests: mapped widget geometry must cover requested button dimensions and remain inside ancestor/root bounds; test both palettes, initial geometry, and minimum supported resize. Do not only assert widget existence.
+- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_layout.py tests/test_gui_settings.py -v)`; `(cd src && .venv/bin/python -m pytest tests -v)`.
+- Complete Implementer prompt: Fix task 38 in `src/todo_md/app.py` and `src/tests/test_gui_layout.py` only (normal hook VERSION change allowed). Diagnose sidebar clipping caused by fixed initial geometry and requested widget sizes. Prefer a small content-aware sizing or layout correction over arbitrary enlarged constants; provide a safe minimum if required. Preserve all controls, style, bindings, and item behavior. Add isolated real-display geometry regressions in both themes that fail before the fix, including supported resizing and actual Settings invocation. Own/destroy test roots even on failure using existing harness patterns. Follow DESIGN Presentation and Tk compatibility constraints. Run both exact commands above. Do not fix settings-window geometry, styling, ordering, or cursors in this task.
 
 ## Queue
 
-- 38: Main-window Settings button must be fully visible on opening.
 - 39: Settings Save/Cancel buttons must be fully visible on opening and horizontally centered.
 - 40: Settings Theme section needs palette-matched light/dark backgrounds and left/right margins.
 - 41: Completed items must appear above incomplete items in completion order (oldest first); completing another item should evict only the oldest visible completed item when the configured limit is exceeded.
