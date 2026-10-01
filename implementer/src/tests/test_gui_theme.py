@@ -1,7 +1,11 @@
 """GUI tests for the theme switcher (config persistence, toggle, readability)."""
 
 import json
+from unittest.mock import Mock, patch
 
+import pytest
+
+from tests.conftest import managed_tk_roots
 from todo_md.app import TodoApp, TodoController
 from todo_md.storage import MarkdownListStore
 from todo_md.settings import system_default_theme
@@ -26,6 +30,90 @@ def _write_config(tmp_path, theme):
     (config_dir / "settings.json").write_text(
         json.dumps({"theme": theme}), encoding="utf-8"
     )
+
+
+def _assert_input_caret_contrast(app, entry):
+    from tkinter import ttk
+
+    assert isinstance(entry, (ttk.Entry, ttk.Spinbox))
+    style = ttk.Style(app.root)
+    name = entry.cget("style") or entry.winfo_class()
+    # ttk uses the insertcolor style option, not tk.Entry's insertbackground.
+    caret = style.lookup(name, "insertcolor", entry.state())
+    background = style.lookup(name, "fieldbackground", entry.state())
+    assert caret, f"{name} has no explicit insertion color"
+    assert background, f"{name} has no explicit field background"
+    assert caret == app._palette["fg"]
+    assert background == app._palette["entry_bg"]
+    assert abs(lum(app.root, caret) - lum(app.root, background)) >= 0.5
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("entry_name", ["new_name_entry", "new_item_entry"])
+def test_entry_caret_contrast_preserves_focused_editing(tmp_path, monkeypatch, theme, entry_name):
+    _write_config(tmp_path, theme)
+    errors = []
+    with managed_tk_roots() as create_root:
+        monkeypatch.setattr("tkinter.Tk", create_root)
+        app = _build_app(tmp_path)
+        app.root.report_callback_exception = lambda exc, val, tb: errors.append(val)
+        app.root.update()
+        entry = getattr(app, entry_name)
+        placeholder = app._placeholders[entry]
+        assert entry.get() == placeholder
+        _assert_input_caret_contrast(app, entry)
+
+        entry.focus_force()
+        app.root.update()
+        assert entry.get() == ""
+        entry.insert(0, "draft")
+        entry.icursor(2)
+        opposite = "dark" if theme == "light" else "light"
+        for expected_theme in (theme, opposite, theme):
+            if app.theme != expected_theme:
+                entry.selection_range(0, 1)
+                app._theme_btn.invoke()
+                app.root.update()
+                assert (entry.index("sel.first"), entry.index("sel.last")) == (0, 1)
+                entry.selection_clear()
+            assert app.theme == expected_theme
+            assert app.root.focus_get() is entry
+            assert entry.instate(["focus", "!disabled", "!readonly"])
+            assert entry.get() == "draft"
+            assert entry.index("insert") == 2
+            _assert_input_caret_contrast(app, entry)
+            assert str(entry.cget("foreground")) == app._palette["fg"]
+            entry.event_generate("<KeyPress>", keysym="x")
+            app.root.update()
+            assert entry.get() == "drxaft"
+            entry.event_generate("<KeyPress>", keysym="BackSpace")
+            app.root.update()
+            assert entry.get() == "draft"
+            for other, hint in app._placeholders.items():
+                if other is not entry:
+                    assert other.get() == hint
+                    assert str(other.cget("foreground")) == app._palette["placeholder_fg"]
+
+        entry.delete(0, "end")
+        app.listbox.focus_force()
+        app.root.update()
+        assert entry.get() == placeholder
+        assert str(entry.cget("foreground")) == app._palette["placeholder_fg"]
+        _assert_input_caret_contrast(app, entry)
+    assert errors == []
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_native_appearance_leaves_styles_untouched(theme):
+    app = TodoApp.__new__(TodoApp)
+    app.root = Mock()
+    app._palette = None
+    with patch("tkinter.ttk.Style") as style:
+        app._apply_theme(theme)
+    app.root.tk.call.assert_called_once_with("tk", "appappearance", theme)
+    style.assert_not_called()
+    app.root.config.assert_not_called()
+    assert app._palette is None
 
 
 def test_startup_dark(tmp_path):

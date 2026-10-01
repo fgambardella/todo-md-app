@@ -453,19 +453,22 @@ class TodoApp:
             background=[("active", btn_active), ("pressed", btn_active)],
             foreground=[("active", fg), ("pressed", fg)],
         )
-        # The clam TEntry field element consumes the *element* option
+        # The clam entry/spinbox field consumes the *element* option
         # fieldbackground for its fill; background/foreground alone leave
         # a light field in dark mode, making light text invisible.
         # In dark mode the entry fill (#383838) is deliberately slightly
         # lighter than the listbox background (#2d2d2d): with identical
         # colors the entries read as *darker* than the list (optical
         # effect), so a lighter entry fill corrects the perceived contrast.
-        style.configure(
-            "TEntry",
-            background=entry_bg,
-            foreground=fg,
-            fieldbackground=entry_bg,
-        )
+        # ttk carets use insertcolor, not the plain tk insertbackground option.
+        for name in ("TEntry", "TSpinbox"):
+            style.configure(
+                name,
+                background=entry_bg,
+                foreground=fg,
+                fieldbackground=entry_bg,
+                insertcolor=fg,
+            )
         self.root.config(bg=bg)
         if self.settings_window is not None and self.settings_window.winfo_exists():
             self.settings_window.config(bg=bg)
@@ -481,11 +484,13 @@ class TodoApp:
         version_label = getattr(self, "version_label", None)
         if version_label is not None:
             version_label.config(bg=bg, foreground=self._palette["version_fg"])
-        # Keep a *displayed* placeholder in sync with the new theme's muted
-        # gray; entries holding real text keep the style foreground.
+        # Placeholder focus handlers set a widget-level foreground, so refresh
+        # both displayed hints and real text when the palette changes.
         for entry, text in self._placeholders.items():
-            if entry.winfo_exists() and entry.get() == text:
-                entry.configure(foreground=self._palette["placeholder_fg"])
+            if entry.winfo_exists():
+                entry.configure(
+                    foreground=self._palette["placeholder_fg"] if entry.get() == text else fg
+                )
 
     # -- dock icon --------------------------------------------------------
 
