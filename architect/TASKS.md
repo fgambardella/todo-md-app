@@ -27,11 +27,17 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 39: Visible centered Settings actions (S)
+
+- Branch: `implementer/task-39-settings-actions`; base/integration: `main`.
+- Scope: one focused Settings-dialog layout correction for clipped and right-aligned Save/Cancel buttons.
+- Acceptance: both actions and all settings fields fit when opened in light/dark modes; the combined Cancel/Save group is horizontally centered and stays centered after widening. Minimum resizing cannot clip controls. Existing Save/Cancel behavior and single-dialog lifecycle remain unchanged.
+- Required tests: actual mapped dimensions/ancestor bounds, centered group midpoint within a small pixel tolerance, initial/enlarged/minimum geometry in both themes, existing behavior regressions.
+- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_gui_layout.py -q)`; `(cd src && .venv/bin/python -m pytest tests -q)`.
+- Complete Implementer prompt: Implement task 39 only in `src/todo_md/app.py` and `src/tests/test_gui_settings.py` (normal hook VERSION change allowed). Replace undersized fixed Settings geometry with content-aware initial/minimum sizing and center the Cancel/Save group as a unit. Preserve the relative button order and all callbacks/behavior. Reuse existing test fixtures and ensure geometry tests prove full visibility, non-overlap and centering on startup and resizing in both palettes. Follow DESIGN Presentation/Tk constraints. Run both exact commands. Do not address Theme section styling/margins, completion ordering, or cursor colors yet.
 
 ## Queue
 
-- 39: Settings Save/Cancel buttons must be fully visible on opening and horizontally centered.
 - 40: Settings Theme section needs palette-matched light/dark backgrounds and left/right margins.
 - 41: Completed items must appear above incomplete items in completion order (oldest first); completing another item should evict only the oldest visible completed item when the configured limit is exceeded.
 - 42: Input-field insertion cursors must remain visible in light mode.
