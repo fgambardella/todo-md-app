@@ -19,7 +19,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated item operations are persisted immediately.
 - The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions. Main-window sizing keeps sidebar controls fully accessible.
 - Light/dark themes include readable controls, a theme-aware version badge, and custom dock/Finder icons.
-- Settings validate and save the full payload, apply theme and completed-item filtering live, and discard unsaved controls on window Cancel. Filtering never changes stored content.
+- Settings use fully visible, centered Save/Cancel actions, validate and save the full payload, apply theme and completed-item filtering live, and discard unsaved controls on window Cancel. Filtering never changes stored content.
 - Directory changes apply live with optional list movement and an explicit confirmation question; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, transfers reject filename collisions without overwriting, equivalent paths are harmless, and configuration stays fixed.
 - Relocation failures preserve recoverable files and refresh the active view. Failed settings persistence keeps the destination usable and supports retry without repeating completed moves; pending theme/filter edits remain unapplied.
 - Automated GUI tests intercept unexpected dialogs and verify cleanup after failures without human interaction.
@@ -27,14 +27,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-### 39: Visible centered Settings actions (S)
-
-- Branch: `implementer/task-39-settings-actions`; base/integration: `main`.
-- Scope: one focused Settings-dialog layout correction for clipped and right-aligned Save/Cancel buttons.
-- Acceptance: both actions and all settings fields fit when opened in light/dark modes; the combined Cancel/Save group is horizontally centered and stays centered after widening. Minimum resizing cannot clip controls. Existing Save/Cancel behavior and single-dialog lifecycle remain unchanged.
-- Required tests: actual mapped dimensions/ancestor bounds, centered group midpoint within a small pixel tolerance, initial/enlarged/minimum geometry in both themes, existing behavior regressions.
-- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_settings.py tests/test_gui_layout.py -q)`; `(cd src && .venv/bin/python -m pytest tests -q)`.
-- Complete Implementer prompt: Implement task 39 only in `src/todo_md/app.py` and `src/tests/test_gui_settings.py` (normal hook VERSION change allowed). Replace undersized fixed Settings geometry with content-aware initial/minimum sizing and center the Cancel/Save group as a unit. Preserve the relative button order and all callbacks/behavior. Reuse existing test fixtures and ensure geometry tests prove full visibility, non-overlap and centering on startup and resizing in both palettes. Follow DESIGN Presentation/Tk constraints. Run both exact commands. Do not address Theme section styling/margins, completion ordering, or cursor colors yet.
+None.
 
 ## Queue
 
@@ -48,8 +41,8 @@ None.
 
 ## Recently Completed
 
+- 39: Visible centered Settings actions; independently verified and approved; `7c69eb2413098f97ffa91d5e2507578c07aac669`.
 - 38: Main-window sidebar visibility; independently verified and approved; `ba7e7bbe4fc309c02ed23c099403c292e81256af`.
 - 37: Populated lists destinations and confirmation question; independently verified and approved; `b20176d08c7450398a1767e82b5bf5669fc6c62e`.
 - 36b2: GUI relocation and unattended test harness; independently verified and approved; `a0fc76918d5424334a1116176838013115eaed84`.
 - 36b1: Headless controller directory switching; verified and merged; `9612b3b`.
-- 36a: Headless lists-directory relocation; verified and merged; `f543275`.
