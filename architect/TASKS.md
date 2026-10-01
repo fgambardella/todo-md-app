@@ -27,7 +27,15 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+### 43: Long-text test apparent stall (S)
+
+- Branch: `implementer/task-43-long-text-test-lifecycle`; base/integration: `main`.
+- Scope: diagnose and correct the long-label test's native-window lifecycle, not shorten the text or weaken layout coverage.
+- Evidence: layout file passes in 0.88s; long-text call is 0.07s with negligible teardown. Full suite is 303 passed/2 gated skips in 22.28s; following lifecycle subprocess cases cost roughly 0.5-0.7s each. Native probes show Tk destruction can leave pending Cocoa/WindowServer cleanup. No actual text-rendering timeout reproduced.
+- Acceptance: root cause is supported by timings/lifecycle evidence; long-label coverage remains meaningful and bounded; its window cannot remain visibly stalled through subsequent blocking subprocess tests. Preserve real mapped geometry tests and owned-root/error-cleanup guarantees. No sleeps, blanket skips, shortened data, or in-process replacement of isolation proofs. Avoid claiming a speedup unsupported by measurement.
+- Required tests: regression for the diagnosed lifecycle/isolation issue with actual long text; existing mapped layout and failure-cleanup proofs; comparable targeted/full-suite timing. Prefer deterministic lifecycle assertions over fragile subsecond deadlines.
+- Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_layout.py tests/test_gui_lifecycle.py tests/test_dialog_guard.py -q --durations=15 -o faulthandler_timeout=10)`; `(cd src && .venv/bin/python -m pytest tests -q --durations=20 -o faulthandler_timeout=10)`.
+- Complete Implementer prompt: Diagnose task 43 and implement the smallest evidence-backed correction within `src/tests/test_gui_layout.py`, `src/tests/conftest.py`, `src/tests/test_gui_lifecycle.py`, and `src/tests/test_dialog_guard.py` (normal hook VERSION change allowed). Long-label assertions currently inspect text/pack metadata, while separate tests require actual mapped geometry. Distinguish structural test needs, native window lifetime and the cost of following subprocess proofs; do not presume long-string rendering is slow. Investigate cleanup before choosing a change, retain owned-root teardown even on failure and fail-fast dialogs, and add a deterministic regression demonstrating the corrected behavior. A withdrawn structural-only test is acceptable only if evidence shows mapping is unnecessary and mapped geometry coverage remains intact, not as a way to suppress an actual uninvestigated hang. Do not edit application code or broaden into a suite rewrite. Follow DESIGN Verification harness/Tk compatibility. Run both commands and report precise diagnosis, before/after timing and any remaining platform-specific uncertainty.
 
 ## Queue
 
