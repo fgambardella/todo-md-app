@@ -27,6 +27,7 @@ Paths below are relative to `implementer/src/`.
 ## Data Models and Flow
 
 - Domain ownership and fields are canonical in `todo_md/models.py`; storage maps each list to `<Name>.md`. GUI-only filtering never changes persisted items.
+- Toggle mutations persist completed items first in completion order using Markdown row order, without extra metadata; legacy completed rows retain relative order. Undo returns the item to the incomplete-group front, and re-completion makes it newest. Controller returns the selected object even when its position changes.
 - GUI actions flow through controller to storage; list mutations are re-read for rendering. Storage writes use temporary files and replacement to avoid partial individual files.
 - Window initial/minimum dimensions follow fixed-control requests; main-window sizing precedes loading lists so item text and list length cannot dictate size. Settings actions remain centered as one group.
 - Relocation creates the destination and optionally transfers top-level Markdown files verbatim. Populated destinations are allowed; transfers preflight every source filename against existing destination paths, and exclusive creation prevents racing overwrites. Source deletion follows a completed copy, including across filesystems. Non-Markdown content remains in place.
