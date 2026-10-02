@@ -16,52 +16,19 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Current Implementation Summary
 
-- Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated item operations are persisted immediately.
-- The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions. Main-window sizing keeps sidebar controls fully accessible. Completed items retain completion order above unfinished items, showing only the newest configured count without deleting hidden items.
-- Light/dark themes include readable controls and insertion cursors, a theme-aware version badge, and custom dock/Finder icons. Settings theme controls have consistent palette colors and symmetric margins, including during live theme changes.
+- Lists persist as separate Markdown files with atomic writes and filesystem-safe names; validated operations persist immediately.
+- The GUI supports list creation, item toggles, per-item deletion, placeholder hints, and confirmation of destructive actions. Main-window sizing keeps sidebar controls accessible. Completed items retain completion order above unfinished items, showing only the newest configured count without deleting hidden items.
+- Light/dark themes include readable controls and insertion cursors, a theme-aware version badge, and custom dock/Finder icons. Settings theme controls have consistent palette colors and symmetric margins, including during live changes.
 - Settings use fully visible, centered Save/Cancel actions, validate and save the full payload, apply theme and completed-item filtering live, and discard unsaved controls on window Cancel. Filtering never changes stored content.
-- Directory changes apply live with optional list movement and an explicit confirmation question; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, transfers reject filename collisions without overwriting, equivalent paths are harmless, and configuration stays fixed.
-- Relocation failures preserve recoverable files and refresh the active view. Failed settings persistence keeps the destination usable and supports retry without repeating completed moves; pending theme/filter edits remain unapplied.
-- Automated GUI tests intercept unexpected dialogs and verify cleanup after failures without human interaction. Structural label checks avoid unnecessary native-window presentation.
+- Directory changes apply live with optional list movement and an explicit confirmation; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, collisions are rejected without overwriting, equivalent paths are harmless, and configuration stays fixed.
+- Relocation failures preserve recoverable files and refresh the active view; failed settings persistence keeps the destination usable and supports retry without repeating moves, pending theme/filter edits remain unapplied.
+- Automated GUI tests intercept unexpected dialogs and verify cleanup after failures without human interaction.
+- Item rows have an edit icon left of the trash; the pre-populated modal persists new text to the `.md` file on Save, while Cancel or empty input leaves it unchanged.
 - Build and release scripts produce a launch-tested Apple Silicon app bundle and versioned distributable ZIP.
 
 ## Active Task
 
-- **ID:** 44
-- **Title:** Edit a single todo item (pencil icon + edit modal)
-- **Size:** S (decomposed after timeout; sequential micro-tasks 44a → 44b)
-- **Branch:** `implementer/task-44-edit-todo-item` (base and integration: `main`)
-- **Checkpoint:** last commit `45202b2` plus uncommitted working-tree changes (architect-inspected, suite run independently): `app.py` GUI feature, `LICENSE.txt` fix, two untracked PNGs, 8 fixed existing test files (5-tuple unpacks), new `tests/test_gui_edit.py`; full suite green 314 passed / 2 skipped. No 44b commit yet. 44a remains complete at `d2469ac`.
-- **Current status:** all 44b code and tests are done and architect-verified; only the implementing commit is missing.
-- **Current blocker:** 44b' run #3 timed out at 20 min after finishing every change but before committing.
-- **Revised approach:** commit-only run: verify the exact file set, re-run the full suite once, then stage and commit exactly the 13 44b files. No code changes.
-- **Micro-task 44a (done, verified `d2469ac`):** headless `TodoController.edit_item` + domain `TodoList.edit`; empty/whitespace rejected, unchanged text no-op; headless tests green.
-- **Acceptance criteria (44b'):** icon left of trash; modal pre-populated; Save persists and closes; Cancel no-change; empty Save no-persistence; LICENSE names `edit.png`/`edit_18.png`; full suite green; single 44b commit includes the asset files.
-- **Test commands (from `implementer/`):** `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)` then `(cd src && .venv/bin/python -m pytest tests -v)`.
-- **Prompt (44b' - commit only):**
-
-```
-Task 44b'' (commit-only micro-task of task 44): commit the already-completed 44b work.
-
-All task 44b code and tests are complete on this branch and sit uncommitted in the working tree (architect-verified, full suite green). Do NOT modify any code or test files.
-
-BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item` (already checked out, based on integration branch `main`).
-
-Start by following the Implementer Mandatory Execution Clock phase rules:
-1. Your FIRST tool call MUST run `../architect/tools/implementer-run.sh` with no arguments (read-only harness; execute it, never modify it).
-2. Every subsequent Bash command MUST use that wrapper.
-3. Verify the current branch and inspect the working tree (`git status --short`) before committing.
-
-STEPS:
-- Confirm the working tree contains exactly: modified `implementer/src/todo_md/app.py`, `implementer/src/todo_md/assets/LICENSE.txt`, `implementer/src/tests/test_gui_contrast.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_layout.py`, `test_gui_settings.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_toggle.py`; untracked `implementer/src/tests/test_gui_edit.py`, `implementer/src/todo_md/assets/edit.png`, `implementer/src/todo_md/assets/edit_18.png`.
-- Run the full suite once from `implementer/`: `(cd src && .venv/bin/python -m pytest tests -v)` — it must be green.
-- Stage and commit exactly those 13 files with the message `Add per-item edit icon and modal edit dialog`.
-
-RULES:
-- Only modify files under `implementer/`; never touch `architect/` or the repository root.
-- Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`; no broad staging or destructive operations.
-- End with: RESULT (SUCCESS/FAILURE), branch, commit hash, test results, blockers.
-```
+None.
 
 ## Queue
 
@@ -73,8 +40,8 @@ None.
 
 ## Recently Completed
 
+- 44: Per-item edit icon left of trash and modal edit dialog (headless `edit_item` + GUI); independently verified and approved; `3181f134a4f3f25b0ba2cd0fb3a8c8a5c04db406`.
 - 43: Withdrawn structural long-label test and lifecycle regression; independently verified and approved; `47020e50c32afa52fb32296b87bc9991d18b3989`.
 - 42: Input caret contrast across themes; independently verified and approved; `dceb909362fb036ec69712139c27492d86c9b5d3`.
 - 41: Persisted completion order and safe filtered GUI callbacks; independently verified and approved; `5b9c4457bf25fc6b682ffd1e14e243577789e81c`.
 - 40: Settings Theme palette and margins; independently verified and approved; `9d785ef23b8b9778645936b5e7f42113a8ae9434`.
-- 39: Visible centered Settings actions; independently verified and approved; `7c69eb2413098f97ffa91d5e2507578c07aac669`.
