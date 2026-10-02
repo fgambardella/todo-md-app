@@ -28,7 +28,8 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+- GUI change request: open edit todo item modal when double click is detected on the todo item text and item is not completed.
+- GUI change request: add a description text box in the edit todo item modal. The todo item description should be stored together with the todo item, as a sub element, in a human readable way in the .md file.
 
 ## Queue
 
