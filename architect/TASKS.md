@@ -31,44 +31,43 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - **Title:** Edit a single todo item (pencil icon + edit modal)
 - **Size:** S (decomposed after timeout; sequential micro-tasks 44a → 44b)
 - **Branch:** `implementer/task-44-edit-todo-item` (base and integration: `main`)
-- **Checkpoint:** `d2469ac` (44a complete and independently verified: `TodoList.edit` + headless `TodoController.edit_item` with empty-text rejection and unchanged-text no-op; `tests/test_controller.py` extended; full suite 309 passed / 2 gated skips; commit also includes hook-staged VERSION bump).
-- **Current status:** 44a done and verified on the branch; 44b (GUI icon + modal + GUI tests + LICENSE/asset commit) now delegating.
-- **Revised approach:** split into sequential micro-tasks after the first timeout; 44a done, 44b next.
+- **Checkpoint:** last commit `a3b91b6` plus uncommitted working-tree changes from the timed-out 44b run (architect-inspected): `app.py` GUI implementation (edit icon left of trash, modal with pre-filled entry, save/cancel, graceful empty-text handling), `LICENSE.txt` fix, two untracked PNGs; no `tests/test_gui_edit.py`, no 44b commit. 44a remains complete at `d2469ac`.
+- **Current status:** 44b feature code present but uncommitted and regressing ~39 existing GUI tests: `_item_rows` is now a 5-tuple `(var, cb, label, del_ctrl, edit_ctrl)` while several tests unpack 4-tuples.
+- **Current blocker:** 44b run #2 timed out at 20 min after implementing the feature but before tests/commit; full suite red from the tuple-unpack breakage.
+- **Revised approach:** narrowed 44b' run: fix the tuple unpacks in existing tests, add `tests/test_gui_edit.py`, get the full suite green, commit all 44b files including the three asset files. No new feature code.
 - **Micro-task 44a (done, verified `d2469ac`):** headless `TodoController.edit_item` + domain `TodoList.edit`; empty/whitespace rejected, unchanged text no-op; headless tests green.
-- **Micro-task 44b (now delegating, same branch):** add the `edit_18.png` icon strictly left of the trash icon on each item row (themed like `trash_18.png` in `implementer/src/todo_md/app.py`; reference `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py`); clicking opens a modal styled like the existing confirmation dialogs (theme-aware colors) with an entry pre-populated with the item text and `cancel` / `save` buttons below it; Save calls the 44a controller path and refreshes, Cancel closes unchanged, empty/whitespace Save persists nothing. New `tests/test_gui_edit.py` per `tests/test_gui_confirm.py` + `tests/conftest.py` conventions (isolated dirs, dialog guards, owned roots updated and destroyed). Fix the mislabeled pencil block in `implementer/src/todo_md/assets/LICENSE.txt` to name the real files `edit.png` / `edit_18.png` (keep the Flaticon CC-BY 4.0 attribution). Include the three pre-existing asset files in the 44b commit.
-  - **Acceptance criteria (44b):** icon placement left of trash; modal pre-populated; Save persists to the `.md` file and closes; Cancel no-change; empty Save no-persistence; LICENSE fixed; full suite green.
-  - **Test commands (from `implementer/`):** `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)` then `(cd src && .venv/bin/python -m pytest tests -v)`.
-- **Prompt (44b):**
+- **Acceptance criteria (44b'):** icon left of trash; modal pre-populated; Save persists and closes; Cancel no-change; empty Save no-persistence; LICENSE names `edit.png`/`edit_18.png`; full suite green; single 44b commit includes the asset files.
+- **Test commands (from `implementer/`):** `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)` then `(cd src && .venv/bin/python -m pytest tests -v)`.
+- **Prompt (44b'):**
 
 ```
-Task 44b (GUI micro-task of task 44): add the edit icon and edit modal.
+Task 44b' (narrowed completion micro-task of task 44): fix test regressions, add the edit GUI tests, commit.
 
-The headless method `TodoController.edit_item(name, index, text)` already exists on this branch (raises ValueError on empty/whitespace text; no-op on unchanged text). Do not modify controller/domain logic.
+The GUI feature (edit icon left of the trash icon + edit modal) is already implemented on this branch but UNCOMMITTED in the working tree, along with the `LICENSE.txt` fix and untracked `implementer/src/todo_md/assets/edit.png`, `edit_18.png`. The headless `TodoController.edit_item(name, index, text)` is already committed. Do NOT add or change feature code in `app.py`, `models.py`, or `storage.py`.
 
 BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item` (already checked out, based on integration branch `main`).
 
 Start by following the Implementer Mandatory Execution Clock phase rules:
 1. Your FIRST tool call MUST run `../architect/tools/implementer-run.sh` with no arguments (read-only harness; execute it, never modify it).
 2. Every subsequent Bash command MUST use that wrapper.
-3. Verify the current branch and inspect the working tree (`git status --short`) before editing. Pre-existing state belonging to this micro-task that MUST be included in your commit: untracked `implementer/src/todo_md/assets/edit.png`, untracked `implementer/src/todo_md/assets/edit_18.png`, and the user-modified `implementer/src/todo_md/assets/LICENSE.txt`.
+3. Verify the current branch and inspect the working tree (`git status --short`) before editing.
 
-FEATURE (work under `implementer/` only, GUI layer of `implementer/src/todo_md/app.py`):
-- Add a pencil/edit icon on each todo item row, positioned strictly LEFT of the existing trash bin icon. Use `implementer/src/todo_md/assets/edit_18.png`, loaded and themed exactly like the existing `trash_18.png` usage (reference: the trash-icon code in `app.py` plus `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py`).
-- Clicking the edit icon opens a modal dialog styled like the existing confirmation dialogs (theme-aware colors, same window style as the other dialogs): one entry pre-populated with the item's current text, and below it two buttons: `cancel` (close the modal, no changes) and `save` (call the existing controller `edit_item` for this item, then close the modal and refresh the list).
-- Save with empty/whitespace-only input persists nothing (modal still closes; the controller raises ValueError on such input, handle it gracefully); saving unchanged text is harmless.
-- Fix the pencil block in `implementer/src/todo_md/assets/LICENSE.txt`: it mislabels the asset as `trash.png`/`pencil.png`; reference the real files `edit.png` and `edit_18.png`, keeping the Flaticon CC-BY 4.0 attribution as written.
+KNOWN REGRESSION (architect-verified): `app._item_rows` elements are now 5-tuples `(var, cb, label, del_ctrl, edit_ctrl)`; existing tests still unpack 4-tuples and ~39 GUI tests fail with `ValueError: too many values to unpack` (e.g. `test_gui_contrast.py`, `test_gui_layout.py`, `test_gui_settings.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_toggle.py`).
 
-TESTS (working directory `implementer/src/`):
+SCOPE (work under `implementer/` only):
+- Fix the 4-tuple unpacks of `app._item_rows` in the affected existing tests minimally (append an extra `_edit` variable). If the full suite reveals other regressions caused by the uncommitted 44b change, fix those test-side issues the same minimal way.
 - New `tests/test_gui_edit.py` per `tests/test_gui_trash_icon.py`, `tests/test_gui_confirm.py`, and `tests/conftest.py` conventions: edit icon present on item rows and positioned left of the trash icon; modal opens with the entry pre-populated with the item text; Save persists the new text to the `.md` file and closes; Cancel closes without change; Save on empty/whitespace input persists nothing. No test may need human input.
 
 Commands from `implementer/`:
 - Targeted: `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)`
 - Full: `(cd src && .venv/bin/python -m pytest tests -v)`
 
+COMMIT: stage and commit exactly: `implementer/src/todo_md/app.py`, `implementer/src/todo_md/assets/LICENSE.txt`, `implementer/src/todo_md/assets/edit.png`, `implementer/src/todo_md/assets/edit_18.png`, `implementer/src/tests/test_gui_edit.py`, and the modified existing test files.
+
 RULES:
-- Only modify files under `implementer/`; never touch `architect/` or the repository root; do not change controller/domain logic already committed for 44a.
-- Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`; no broad staging or destructive operations; stage only this micro-task's files (including the three pre-existing asset files).
-- Commit completed work. End with: RESULT (SUCCESS/FAILURE), branch, commit hash, test results, blockers.
+- Only modify files under `implementer/`; never touch `architect/` or the repository root.
+- Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`; no broad staging or destructive operations.
+- End with: RESULT (SUCCESS/FAILURE), branch, commit hash, test results, blockers.
 ```
 
 ## Queue
