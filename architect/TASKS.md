@@ -23,7 +23,7 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - Directory changes apply live with optional list movement and an explicit confirmation; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, collisions are rejected without overwriting, equivalent paths are harmless, and configuration stays fixed.
 - Relocation failures preserve recoverable files and refresh the active view; failed settings persistence keeps the destination usable and supports retry without repeating moves, pending theme/filter edits remain unapplied.
 - Automated GUI tests intercept unexpected dialogs and verify cleanup after failures without human interaction.
-- Item rows have an edit icon left of the trash; the pre-populated modal persists new text to the `.md` file on Save, while Cancel or empty input is a no-op.
+- Item rows have an edit icon left of the trash; the pre-populated modal persists text to the `.md` file on Save, while Cancel or empty input is a no-op.
 - Build and release scripts produce a launch-tested Apple Silicon app bundle and versioned distributable ZIP.
 
 ## Active Task
