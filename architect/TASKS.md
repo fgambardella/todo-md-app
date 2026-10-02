@@ -31,38 +31,31 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - **Title:** Edit a single todo item (pencil icon + edit modal)
 - **Size:** S (decomposed after timeout; sequential micro-tasks 44a → 44b)
 - **Branch:** `implementer/task-44-edit-todo-item` (base and integration: `main`)
-- **Checkpoint:** last commit `a3b91b6` plus uncommitted working-tree changes from the timed-out 44b run (architect-inspected): `app.py` GUI implementation (edit icon left of trash, modal with pre-filled entry, save/cancel, graceful empty-text handling), `LICENSE.txt` fix, two untracked PNGs; no `tests/test_gui_edit.py`, no 44b commit. 44a remains complete at `d2469ac`.
-- **Current status:** 44b feature code present but uncommitted and regressing ~39 existing GUI tests: `_item_rows` is now a 5-tuple `(var, cb, label, del_ctrl, edit_ctrl)` while several tests unpack 4-tuples.
-- **Current blocker:** 44b run #2 timed out at 20 min after implementing the feature but before tests/commit; full suite red from the tuple-unpack breakage.
-- **Revised approach:** narrowed 44b' run: fix the tuple unpacks in existing tests, add `tests/test_gui_edit.py`, get the full suite green, commit all 44b files including the three asset files. No new feature code.
+- **Checkpoint:** last commit `45202b2` plus uncommitted working-tree changes (architect-inspected, suite run independently): `app.py` GUI feature, `LICENSE.txt` fix, two untracked PNGs, 8 fixed existing test files (5-tuple unpacks), new `tests/test_gui_edit.py`; full suite green 314 passed / 2 skipped. No 44b commit yet. 44a remains complete at `d2469ac`.
+- **Current status:** all 44b code and tests are done and architect-verified; only the implementing commit is missing.
+- **Current blocker:** 44b' run #3 timed out at 20 min after finishing every change but before committing.
+- **Revised approach:** commit-only run: verify the exact file set, re-run the full suite once, then stage and commit exactly the 13 44b files. No code changes.
 - **Micro-task 44a (done, verified `d2469ac`):** headless `TodoController.edit_item` + domain `TodoList.edit`; empty/whitespace rejected, unchanged text no-op; headless tests green.
 - **Acceptance criteria (44b'):** icon left of trash; modal pre-populated; Save persists and closes; Cancel no-change; empty Save no-persistence; LICENSE names `edit.png`/`edit_18.png`; full suite green; single 44b commit includes the asset files.
 - **Test commands (from `implementer/`):** `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)` then `(cd src && .venv/bin/python -m pytest tests -v)`.
-- **Prompt (44b'):**
+- **Prompt (44b' - commit only):**
 
 ```
-Task 44b' (narrowed completion micro-task of task 44): fix test regressions, add the edit GUI tests, commit.
+Task 44b'' (commit-only micro-task of task 44): commit the already-completed 44b work.
 
-The GUI feature (edit icon left of the trash icon + edit modal) is already implemented on this branch but UNCOMMITTED in the working tree, along with the `LICENSE.txt` fix and untracked `implementer/src/todo_md/assets/edit.png`, `edit_18.png`. The headless `TodoController.edit_item(name, index, text)` is already committed. Do NOT add or change feature code in `app.py`, `models.py`, or `storage.py`.
+All task 44b code and tests are complete on this branch and sit uncommitted in the working tree (architect-verified, full suite green). Do NOT modify any code or test files.
 
 BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item` (already checked out, based on integration branch `main`).
 
 Start by following the Implementer Mandatory Execution Clock phase rules:
 1. Your FIRST tool call MUST run `../architect/tools/implementer-run.sh` with no arguments (read-only harness; execute it, never modify it).
 2. Every subsequent Bash command MUST use that wrapper.
-3. Verify the current branch and inspect the working tree (`git status --short`) before editing.
+3. Verify the current branch and inspect the working tree (`git status --short`) before committing.
 
-KNOWN REGRESSION (architect-verified): `app._item_rows` elements are now 5-tuples `(var, cb, label, del_ctrl, edit_ctrl)`; existing tests still unpack 4-tuples and ~39 GUI tests fail with `ValueError: too many values to unpack` (e.g. `test_gui_contrast.py`, `test_gui_layout.py`, `test_gui_settings.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_toggle.py`).
-
-SCOPE (work under `implementer/` only):
-- Fix the 4-tuple unpacks of `app._item_rows` in the affected existing tests minimally (append an extra `_edit` variable). If the full suite reveals other regressions caused by the uncommitted 44b change, fix those test-side issues the same minimal way.
-- New `tests/test_gui_edit.py` per `tests/test_gui_trash_icon.py`, `tests/test_gui_confirm.py`, and `tests/conftest.py` conventions: edit icon present on item rows and positioned left of the trash icon; modal opens with the entry pre-populated with the item text; Save persists the new text to the `.md` file and closes; Cancel closes without change; Save on empty/whitespace input persists nothing. No test may need human input.
-
-Commands from `implementer/`:
-- Targeted: `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)`
-- Full: `(cd src && .venv/bin/python -m pytest tests -v)`
-
-COMMIT: stage and commit exactly: `implementer/src/todo_md/app.py`, `implementer/src/todo_md/assets/LICENSE.txt`, `implementer/src/todo_md/assets/edit.png`, `implementer/src/todo_md/assets/edit_18.png`, `implementer/src/tests/test_gui_edit.py`, and the modified existing test files.
+STEPS:
+- Confirm the working tree contains exactly: modified `implementer/src/todo_md/app.py`, `implementer/src/todo_md/assets/LICENSE.txt`, `implementer/src/tests/test_gui_contrast.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_layout.py`, `test_gui_settings.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_toggle.py`; untracked `implementer/src/tests/test_gui_edit.py`, `implementer/src/todo_md/assets/edit.png`, `implementer/src/todo_md/assets/edit_18.png`.
+- Run the full suite once from `implementer/`: `(cd src && .venv/bin/python -m pytest tests -v)` — it must be green.
+- Stage and commit exactly those 13 files with the message `Add per-item edit icon and modal edit dialog`.
 
 RULES:
 - Only modify files under `implementer/`; never touch `architect/` or the repository root.
