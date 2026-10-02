@@ -214,6 +214,26 @@ class TodoController:
         self._load_and_save(name, _mutate)
         return toggled
 
+    def edit_item(self, name: str, index: int, text: str) -> TodoItem:
+        """Replace the text of the item at ``index`` and persist the change.
+
+        Empty or whitespace-only text is rejected before anything is
+        loaded or persisted. Saving unchanged text (ignoring surrounding
+        whitespace) is a no-op: nothing is written.
+        """
+        stripped = (text or "").strip()
+        if not stripped:
+            raise ValueError("todo item text must not be empty")
+
+        todo_list = self.open_list(name)
+        item = todo_list.items[index]
+        if item.text == stripped:
+            return item
+
+        todo_list.edit(index, stripped)
+        self.store.save(name, [(i.text, i.done) for i in todo_list.items])
+        return todo_list.items[index]
+
     def remove_item(self, name: str, index: int) -> TodoItem:
         """Remove the item at ``index`` and persist the change."""
 

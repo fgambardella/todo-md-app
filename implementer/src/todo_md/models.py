@@ -57,6 +57,19 @@ class TodoList:
         """Remove and return the item at ``index``."""
         return self.items.pop(index)
 
+    def edit(self, index: int, text: str) -> TodoItem:
+        """Replace the text of the item at ``index`` and return it.
+
+        The text is stripped; a ValueError is raised if the resulting
+        text is empty.
+        """
+        stripped = text.strip()
+        if not stripped:
+            raise ValueError("todo item text must not be empty")
+        item = self.items[index]
+        item.text = stripped
+        return item
+
     def rename(self, new_name: str) -> None:
         """Rename this list."""
         self.name = new_name

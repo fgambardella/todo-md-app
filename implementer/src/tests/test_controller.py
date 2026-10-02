@@ -167,6 +167,59 @@ def test_remove_item_deletes_line_from_disk(controller, tmp_path):
     assert "- [ ] keep me" in content
 
 
+def test_edit_item_persists_new_text_and_is_reloaded(controller, tmp_path):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+    controller.add_item("work", "task two")
+
+    edited = controller.edit_item("work", 0, "  renamed task  ")
+
+    assert (edited.text, edited.done) == ("renamed task", False)
+    content = _file(tmp_path, "work").read_text(encoding="utf-8")
+    assert "- [ ] renamed task" in content
+    assert "task one" not in content
+    assert "- [ ] task two" in content
+    # The controller re-reads the persisted list (same reload pattern as other mutations).
+    reloaded = TodoController(MarkdownListStore(controller.store.data_dir))
+    assert [item.text for item in reloaded.open_list("work").items] == [
+        "renamed task",
+        "task two",
+    ]
+
+
+@pytest.mark.parametrize("new_text", ["", "   "])
+def test_edit_item_empty_text_persists_nothing(controller, tmp_path, monkeypatch, new_text):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+    path = _file(tmp_path, "work")
+    original = path.read_bytes()
+    save = Mock(wraps=controller.store.save)
+    monkeypatch.setattr(controller.store, "save", save)
+
+    with pytest.raises(ValueError):
+        controller.edit_item("work", 0, new_text)
+
+    save.assert_not_called()
+    assert path.read_bytes() == original
+    assert [item.text for item in controller.open_list("work").items] == ["task one"]
+
+
+@pytest.mark.parametrize("new_text", ["task one", "  task one  "])
+def test_edit_item_unchanged_text_is_harmless_noop(controller, tmp_path, monkeypatch, new_text):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+    path = _file(tmp_path, "work")
+    original = path.read_bytes()
+    save = Mock(wraps=controller.store.save)
+    monkeypatch.setattr(controller.store, "save", save)
+
+    edited = controller.edit_item("work", 0, new_text)
+
+    assert (edited.text, edited.done) == ("task one", False)
+    save.assert_not_called()
+    assert path.read_bytes() == original
+
+
 def test_list_names_reflects_created_and_deleted_lists(controller):
     assert controller.list_names() == []
 
