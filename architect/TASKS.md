@@ -46,33 +46,32 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 ```
 Task 44 (size S): implement editing of a single todo item.
 
-BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item`, which is already checked out and based on `main` (the integration branch).
+BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item` (already checked out, based on integration branch `main`).
 
 Start by following the Implementer Mandatory Execution Clock phase rules:
-1. Your FIRST tool call MUST run `../architect/tools/implementer-run.sh` with no arguments (read-only harness; you may execute it but never modify it).
-2. Every subsequent Bash command MUST use that same wrapper.
-3. Verify the current branch is `implementer/task-44-edit-todo-item` and inspect the working tree (`git status --short`) before editing. Known pre-existing state that belongs to this task and must end up in your commit: untracked `implementer/src/todo_md/assets/edit.png`, untracked `implementer/src/todo_md/assets/edit_18.png`, and the user-modified `implementer/src/todo_md/assets/LICENSE.txt`.
+1. Your FIRST tool call MUST run `../architect/tools/implementer-run.sh` with no arguments (read-only harness; execute it, never modify it).
+2. Every subsequent Bash command MUST use that wrapper.
+3. Verify the current branch and inspect the working tree (`git status --short`) before editing. Known pre-existing state belonging to this task that must end up in your commit: untracked `implementer/src/todo_md/assets/edit.png` and `edit_18.png`, and the user-modified `implementer/src/todo_md/assets/LICENSE.txt`.
 
 FEATURE (work under `implementer/` only):
-- Add a pencil/edit icon on each todo item row, positioned to the LEFT of the existing trash bin icon. Use `implementer/src/todo_md/assets/edit_18.png`, loaded and themed exactly like the existing `trash_18.png` usage in `implementer/src/todo_md/app.py` (read that code and the `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py` tests as the reference pattern).
-- Clicking the edit icon opens a modal dialog: one input (entry) pre-populated with the item's current text, and below it two buttons: `cancel` (close the modal, no changes) and `save` (close the modal after saving the new text to the item). Model the modal on the existing confirmation-dialog style already in `app.py`, including theme-aware colors.
-- Add a headless controller method (e.g. `TodoController.edit_item`) that updates the item text through the domain/storage layers and persists immediately with the same re-read/refresh behavior as other mutations. No tkinter imports in controller/domain code.
-- Save with empty or whitespace-only input must persist nothing (modal still closes). Saving the unchanged text is harmless.
-- Fix the pencil-icon block in `implementer/src/todo_md/assets/LICENSE.txt`: it currently mislabels the asset as `trash.png`/`pencil.png`; rename it to reference the real files `edit.png` and `edit_18.png` (keep the Flaticon CC-BY 4.0 attribution as written).
+- Add a pencil/edit icon on each todo item row, LEFT of the existing trash bin icon. Use `implementer/src/todo_md/assets/edit_18.png`, loaded and themed exactly like `trash_18.png` in `implementer/src/todo_md/app.py` (reference pattern: that code plus `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py`).
+- Clicking the edit icon opens a modal dialog styled like the existing confirmation dialogs in `app.py` (theme-aware colors): one entry pre-populated with the item's current text, and below it two buttons: `cancel` (close, no changes) and `save` (close after saving the new text).
+- Add a headless controller method (e.g. `TodoController.edit_item`) that updates the item text through domain/storage, persists immediately with the same re-read/refresh as other mutations. No tkinter in controller/domain.
+- Save with empty/whitespace-only input persists nothing (modal still closes); saving unchanged text is harmless.
+- Fix the pencil block in `implementer/src/todo_md/assets/LICENSE.txt`: it mislabels the asset as `trash.png`/`pencil.png`; reference the real files `edit.png` and `edit_18.png`, keeping the Flaticon CC-BY 4.0 attribution as written.
 
-TESTS to add/update (working directory `implementer/src/`):
-- Headless: extend `tests/test_controller.py` for the new edit method (text change persisted to the Markdown file, unchanged/whitespace handling, list re-read).
-- New `tests/test_gui_edit.py` following `tests/test_gui_trash_icon.py` and `tests/test_gui_confirm.py` conventions and `tests/conftest.py` (isolated data dirs, dialog guards, owned roots updated and destroyed): edit icon present on item rows and positioned left of the trash icon; modal opens pre-populated with the item text; Save persists the new text to the `.md` file and closes; Cancel closes without change; Save with empty/whitespace input persists nothing.
-- No test may require human input.
+TESTS (working directory `implementer/src/`):
+- Extend `tests/test_controller.py`: edit persists text to the `.md` file, re-reads, unchanged/whitespace handling.
+- New `tests/test_gui_edit.py` per `tests/test_gui_trash_icon.py`, `tests/test_gui_confirm.py`, and `tests/conftest.py` conventions (isolated dirs, dialog guards, owned roots updated and destroyed): icon present and left of trash; modal pre-populated; Save persists and closes; Cancel no-change; Save on empty/whitespace persists nothing. No test may need human input.
 
-Commands to run from `implementer/`:
+Commands from `implementer/`:
 - Targeted: `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py tests/test_controller.py -v)`
 - Full: `(cd src && .venv/bin/python -m pytest tests -v)`
 
 RULES:
-- Only modify files under `implementer/`. Never modify anything under `architect/` or at the repository root.
-- Never create, switch, merge, rebase, rename, delete, or push branches. Never commit to `main`. No broad staging or destructive working-tree operations; stage only the specific files for this task (including the three pre-existing asset files).
-- Commit completed work. End with a handoff stating: RESULT (SUCCESS/FAILURE), branch name, commit hash, test results, and any blockers.
+- Only modify files under `implementer/`; never touch `architect/` or the repository root.
+- Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`; no broad staging or destructive operations; stage only this task's files (including the three pre-existing asset files).
+- Commit completed work. End with: RESULT (SUCCESS/FAILURE), branch, commit hash, test results, blockers.
 ```
 
 ## Queue
