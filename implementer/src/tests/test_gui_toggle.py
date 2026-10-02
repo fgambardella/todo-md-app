@@ -44,7 +44,7 @@ def make_app(tmp_path):
 
 
 def _rows(app):
-    return [(label.cget("text"), bool(var.get())) for var, _, label, _ in app._item_rows]
+    return [(label.cget("text"), bool(var.get())) for var, _, label, _del, _edit in app._item_rows]
 
 
 def _parse_rgb(value: str) -> tuple:
@@ -62,7 +62,7 @@ def _overstrike(label) -> bool:
 def test_toggle_updates_gui(make_app):
     app = make_app([("first item", False), ("second item", False)])
     assert len(app._item_rows) == 2
-    var, cb, label, _del = app._item_rows[0]
+    var, cb, label, _del, _edit = app._item_rows[0]
 
     # Initially undone
     assert var.get() == 0
@@ -71,7 +71,7 @@ def test_toggle_updates_gui(make_app):
     cb.invoke()
     app.root.update()
 
-    var, cb, label, _del = app._item_rows[0]
+    var, cb, label, _del, _edit = app._item_rows[0]
     assert var.get() == 1
     r, g, b = _parse_rgb(label.cget("foreground"))
     assert max(r, g, b) - min(r, g, b) <= 10, "foreground should be gray"
@@ -79,13 +79,13 @@ def test_toggle_updates_gui(make_app):
     assert label.cget("text") == "first item"
 
     # Second row untouched
-    var2, _cb2, label2, _del2 = app._item_rows[1]
+    var2, _cb2, label2, _del2, _edit2 = app._item_rows[1]
     assert var2.get() == 0
     assert not _overstrike(label2)
 
     cb.invoke()
     app.root.update()
-    var, _cb, label, _del = app._item_rows[0]
+    var, _cb, label, _del, _edit = app._item_rows[0]
     assert var.get() == 0
     assert not _overstrike(label)
 

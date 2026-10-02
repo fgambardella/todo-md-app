@@ -31,7 +31,7 @@ def test_label_foreground_adapts_to_background(tmp_path):
         app._refresh_items()
         root.update()
 
-        _var, _cb, active_label, _del = app._item_rows[1]
+        _var, _cb, active_label, _del, _edit = app._item_rows[1]
         assert active_label.cget("text") == "Alpha"
         assert lum(root, active_label.cget("foreground")) < 0.5
         bg_lum = lum(root, root.winfo_rgb(active_label.cget("bg")))
@@ -42,10 +42,10 @@ def test_label_foreground_adapts_to_background(tmp_path):
         app._refresh_items()
         root.update()
 
-        _var, _cb, active_label, _del = app._item_rows[1]
+        _var, _cb, active_label, _del, _edit = app._item_rows[1]
         assert lum(root, active_label.cget("foreground")) > 0.5
 
-        _var, _cb, done_label, _del = app._item_rows[0]
+        _var, _cb, done_label, _del, _edit = app._item_rows[0]
         assert done_label.cget("text") == "Beta"
         assert lum(root, done_label.cget("foreground")) >= 0.3
 

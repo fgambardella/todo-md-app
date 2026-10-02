@@ -9,3 +9,9 @@ Asset: dock_icon.jpg
 - Source: https://www.freestock.com/
 - License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
 - Attribution: ""
+
+Asset: edit.png
+- File: assets/edit.png, assets/edit_18.png
+- Source: https://www.flaticon.com/free-icons/pencil
+- License: CC-BY 4.0 (https://creativecommons.org/licenses/by/4.0/)
+- Attribution: "Pencil icons created by M Karruly - Flaticon"

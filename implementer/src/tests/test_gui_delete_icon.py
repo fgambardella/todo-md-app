@@ -30,7 +30,7 @@ def test_delete_control_is_trash_icon_label(tmp_path):
 
         assert len(app._item_rows) == 2
         for row in app._item_rows:
-            assert len(row) == 4
+            assert len(row) == 5
             delete_ctrl = row[3]
             assert isinstance(delete_ctrl, tk.Label)
             assert str(delete_ctrl.cget("image"))  # non-empty image (photo)

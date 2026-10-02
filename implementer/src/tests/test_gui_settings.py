@@ -131,7 +131,7 @@ def _assert_view(app, names, selected, items):
         (names.index(selected),) if selected is not None else ()
     )
     assert app.title_label.cget("text") == (selected or "(no list selected)")
-    assert [(label.cget("text"), bool(var.get())) for var, _, label, _ in app._item_rows] == items
+    assert [(label.cget("text"), bool(var.get())) for var, _, label, _del, _edit in app._item_rows] == items
     assert len(app.items_frame.winfo_children()) == len(items)
     assert all(widget.winfo_exists() for row in app._item_rows for widget in row[1:])
     assert app.callback_errors == []

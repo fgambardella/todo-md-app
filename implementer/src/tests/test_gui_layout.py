@@ -128,7 +128,7 @@ def test_item_label_layout(make_app):
 
     app = make_app(item_text=LONG_TEXT, mapped=False)
     assert app._item_rows, "expected at least one item row"
-    _var, checkbutton, label, _del = app._item_rows[0]
+    _var, checkbutton, label, _del, _edit = app._item_rows[0]
 
     # Label anchored left
     assert label.cget("anchor") == "w"
