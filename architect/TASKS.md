@@ -31,43 +31,43 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - **Title:** Edit a single todo item (pencil icon + edit modal)
 - **Size:** S (decomposed after timeout; sequential micro-tasks 44a → 44b)
 - **Branch:** `implementer/task-44-edit-todo-item` (base and integration: `main`)
-- **Checkpoint:** `996faf0` (branch tip; first delegation timed out at 20 min with `COMMIT: NONE` and no working-tree changes beyond the three pre-existing user asset files: untracked `implementer/src/todo_md/assets/edit.png`, `edit_18.png`, modified `LICENSE.txt`).
-- **Current status:** nothing implemented; starting state is the branch tip.
-- **Current blocker (resolved by split):** single-shot delegation exceeded the 20-minute child limit without producing a commit.
+- **Checkpoint:** `d2469ac` (44a complete and independently verified: `TodoList.edit` + headless `TodoController.edit_item` with empty-text rejection and unchanged-text no-op; `tests/test_controller.py` extended; full suite 309 passed / 2 gated skips; commit also includes hook-staged VERSION bump).
+- **Current status:** 44a done and verified on the branch; 44b (GUI icon + modal + GUI tests + LICENSE/asset commit) now delegating.
 - **Revised approach:** 44a = headless controller edit path + headless tests (no GUI). 44b = edit icon left of trash, edit modal, GUI tests, LICENSE/asset commit.
-- **Micro-task 44a (now delegating):** add `TodoController.edit_item` updating item text through domain/storage, persisting immediately with the same re-read/refresh as other mutations; no tkinter in controller/domain. Empty/whitespace-only new text is rejected (no persistence); unchanged text is harmless. Extend `tests/test_controller.py` accordingly.
-  - **Acceptance criteria (44a):** controller method persists the new text to the `.md` file and re-reads; empty/whitespace input persists nothing; no tkinter imports introduced outside GUI layer; headless tests pass.
-  - **Test commands (from `implementer/`):** `(cd src && .venv/bin/python -m pytest tests/test_controller.py -v)` then `(cd src && .venv/bin/python -m pytest tests -v)`.
-- **Micro-task 44b (queued after 44a, same branch):** add the `edit_18.png` icon strictly left of the trash icon on each item row (themed like `trash_18.png` in `implementer/src/todo_md/app.py`; reference `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py`); clicking opens a modal styled like the existing confirmation dialogs (theme-aware colors) with an entry pre-populated with the item text and `cancel` / `save` buttons below it; Save calls the 44a controller path and refreshes, Cancel closes unchanged, empty/whitespace Save persists nothing. New `tests/test_gui_edit.py` per `tests/test_gui_confirm.py` + `tests/conftest.py` conventions (isolated dirs, dialog guards, owned roots updated and destroyed). Fix the mislabeled pencil block in `implementer/src/todo_md/assets/LICENSE.txt` to name the real files `edit.png` / `edit_18.png` (keep the Flaticon CC-BY 4.0 attribution). Include the three pre-existing asset files in the 44b commit.
+- **Micro-task 44a (done, verified `d2469ac`):** headless `TodoController.edit_item` + domain `TodoList.edit`; empty/whitespace rejected, unchanged text no-op; headless tests green.
+- **Micro-task 44b (now delegating, same branch):** add the `edit_18.png` icon strictly left of the trash icon on each item row (themed like `trash_18.png` in `implementer/src/todo_md/app.py`; reference `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py`); clicking opens a modal styled like the existing confirmation dialogs (theme-aware colors) with an entry pre-populated with the item text and `cancel` / `save` buttons below it; Save calls the 44a controller path and refreshes, Cancel closes unchanged, empty/whitespace Save persists nothing. New `tests/test_gui_edit.py` per `tests/test_gui_confirm.py` + `tests/conftest.py` conventions (isolated dirs, dialog guards, owned roots updated and destroyed). Fix the mislabeled pencil block in `implementer/src/todo_md/assets/LICENSE.txt` to name the real files `edit.png` / `edit_18.png` (keep the Flaticon CC-BY 4.0 attribution). Include the three pre-existing asset files in the 44b commit.
   - **Acceptance criteria (44b):** icon placement left of trash; modal pre-populated; Save persists to the `.md` file and closes; Cancel no-change; empty Save no-persistence; LICENSE fixed; full suite green.
   - **Test commands (from `implementer/`):** `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)` then `(cd src && .venv/bin/python -m pytest tests -v)`.
-- **Prompt (44a):**
+- **Prompt (44b):**
 
 ```
-Task 44a (headless micro-task of task 44): add a controller method to edit a single todo item's text.
+Task 44b (GUI micro-task of task 44): add the edit icon and edit modal.
 
-BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item` (already checked out, based on integration branch `main`). No GUI work in this micro-task.
+The headless method `TodoController.edit_item(name, index, text)` already exists on this branch (raises ValueError on empty/whitespace text; no-op on unchanged text). Do not modify controller/domain logic.
+
+BRANCH: you MUST work on branch `implementer/task-44-edit-todo-item` (already checked out, based on integration branch `main`).
 
 Start by following the Implementer Mandatory Execution Clock phase rules:
 1. Your FIRST tool call MUST run `../architect/tools/implementer-run.sh` with no arguments (read-only harness; execute it, never modify it).
 2. Every subsequent Bash command MUST use that wrapper.
-3. Verify the current branch and inspect the working tree (`git status --short`) before editing. Pre-existing untracked asset files and a modified `LICENSE.txt` under `implementer/src/todo_md/assets/` are NOT part of this micro-task: do not stage, modify, or delete them.
+3. Verify the current branch and inspect the working tree (`git status --short`) before editing. Pre-existing state belonging to this micro-task that MUST be included in your commit: untracked `implementer/src/todo_md/assets/edit.png`, untracked `implementer/src/todo_md/assets/edit_18.png`, and the user-modified `implementer/src/todo_md/assets/LICENSE.txt`.
 
-SCOPE (work under `implementer/` only):
-- Read `implementer/src/todo_md/app.py` (TodoController) and `implementer/src/todo_md/models.py`, `storage.py` to follow the existing mutation pattern (add/toggle/remove).
-- Add a headless `TodoController.edit_item` (name may follow existing conventions) that updates a single item's text through domain/storage and persists immediately with the same re-read/refresh behavior as other mutations. No tkinter imports in controller/domain code.
-- Semantics: empty or whitespace-only new text is rejected (nothing persisted, no crash); saving the unchanged text is a harmless no-op.
+FEATURE (work under `implementer/` only, GUI layer of `implementer/src/todo_md/app.py`):
+- Add a pencil/edit icon on each todo item row, positioned strictly LEFT of the existing trash bin icon. Use `implementer/src/todo_md/assets/edit_18.png`, loaded and themed exactly like the existing `trash_18.png` usage (reference: the trash-icon code in `app.py` plus `tests/test_gui_trash_icon.py` / `tests/test_gui_delete_icon.py`).
+- Clicking the edit icon opens a modal dialog styled like the existing confirmation dialogs (theme-aware colors, same window style/grab behavior): one entry pre-populated with the item's current text, and below it two buttons: `cancel` (close the modal, no changes) and `save` (call the existing controller `edit_item` for this item, then close the modal and refresh the list).
+- Save with empty/whitespace-only input persists nothing (modal still closes; the controller raises ValueError on such input, handle it gracefully); saving unchanged text is harmless.
+- Fix the pencil block in `implementer/src/todo_md/assets/LICENSE.txt`: it mislabels the asset as `trash.png`/`pencil.png`; reference the real files `edit.png` and `edit_18.png`, keeping the Flaticon CC-BY 4.0 attribution as written.
 
 TESTS (working directory `implementer/src/`):
-- Extend `tests/test_controller.py`: edit persists the new text to the `.md` file and the controller re-reads it; empty/whitespace input persists nothing; unchanged text is harmless. Headless only; no display required.
+- New `tests/test_gui_edit.py` per `tests/test_gui_trash_icon.py`, `tests/test_gui_confirm.py`, and `tests/conftest.py` conventions (isolated data/config dirs, dialog guards, owned roots updated and destroyed): edit icon present on item rows and positioned left of the trash icon; modal opens with the entry pre-populated with the item text; Save persists the new text to the `.md` file and closes; Cancel closes without change; Save on empty/whitespace input persists nothing. No test may need human input.
 
 Commands from `implementer/`:
-- Targeted: `(cd src && .venv/bin/python -m pytest tests/test_controller.py -v)`
+- Targeted: `(cd src && .venv/bin/python -m pytest tests/test_gui_edit.py -v)`
 - Full: `(cd src && .venv/bin/python -m pytest tests -v)`
 
 RULES:
-- Only modify files under `implementer/`; never touch `architect/` or the repository root.
-- Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`; no broad staging or destructive operations; stage only this micro-task's files.
+- Only modify files under `implementer/`; never touch `architect/` or the repository root; do not change controller/domain logic already committed for 44a.
+- Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`; no broad staging or destructive operations; stage only this micro-task's files (including the three pre-existing asset files).
 - Commit completed work. End with: RESULT (SUCCESS/FAILURE), branch, commit hash, test results, blockers.
 ```
 
