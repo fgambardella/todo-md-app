@@ -31,11 +31,11 @@ src/
 └── tests/              # pytest suite (headless core + GUI tests on a real display)
 ```
 
-- **Domain — `models.py`**: `TodoItem` (text, done flag, creation timestamp) and `TodoList` (name, items) with validated operations: `add_item`, `toggle`, `remove`, `rename`.
+- **Domain — `models.py`**: `TodoItem` (text, done flag, creation timestamp) and `TodoList` (name, items) with validated operations: `add_item`, `edit`, `toggle`, `remove`, `rename`.
 - **Persistence — `storage.py`**: `MarkdownListStore` reads/writes each list as `<Name>.md` (`- [ ]` / `- [x]` checkbox lines under a `# Name` header). Writes are **atomic** (temp file + `os.replace`, no partial content on failure); list names are sanitized to filesystem-safe characters.
-- **View-model — `app.py` (`TodoController`)**: pure logic bridging domain and storage: create/delete lists, open a list, add/toggle/remove items — every mutation is persisted immediately. No tkinter imports, so it is fully unit-testable without a display.
+- **View-model — `app.py` (`TodoController`)**: pure logic bridging domain and storage: create/delete lists, open a list, add/toggle/edit/remove items — every mutation is persisted immediately. No tkinter imports, so it is fully unit-testable without a display.
 - **Versioning — `version.py` + `VERSION`**: headless `get_version()` reads `todo_md/VERSION` (falls back to `0.0.0`); the GUI displays it as a small low-contrast badge in the bottom-right corner. A git pre-commit hook (installed via `implementer/src/scripts/bump_version.sh --install-hook`) bumps the patch version on every commit.
-- **Presentation — `app.py` (`TodoApp`)**: a native-feeling **Tkinter** GUI (list sidebar with create/delete — button or Enter in the new-list entry, checkbutton-backed item rows, an entry + button for adding items, refresh after each mutation). Deleting a list or an item first asks for confirmation (Yes/No popup). Tkinter is imported lazily so the package stays importable on display-less machines/CI.
+- **Presentation — `app.py` (`TodoApp`)**: a native-feeling **Tkinter** GUI (list sidebar with create/delete — button or Enter in the new-list entry, checkbutton-backed item rows with a trash-bin delete icon and an edit icon opening a pre-populated modal dialog, an entry + button for adding items, refresh after each mutation). Deleting a list or an item first asks for confirmation (Yes/No popup). Tkinter is imported lazily so the package stays importable on display-less machines/CI.
 - **Entry point — `__main__.py`**: launches controller + GUI via `run()`.
 - **Build tooling — `scripts/build_app.sh`**: freezes the app into a self-contained `todo-md.app` bundle for Apple Silicon macOS (see “Building a self-contained app bundle” below).
 
@@ -70,7 +70,7 @@ cd src
 .venv/bin/python -m pytest tests -v
 ```
 
-Expected: 127 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_settings.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, `test_startup.py`, `test_visible_items.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`, `test_gui_dock_icon.py`, `test_gui_settings.py`.
+Expected: 314 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_settings.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, `test_startup.py`, `test_visible_items.py`, `test_dialog_guard.py`, `test_gui_lifecycle.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_edit.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`, `test_gui_dock_icon.py`, `test_gui_settings.py`.
 
 ## Running the app
 

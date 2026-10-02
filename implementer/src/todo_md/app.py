@@ -214,6 +214,26 @@ class TodoController:
         self._load_and_save(name, _mutate)
         return toggled
 
+    def edit_item(self, name: str, index: int, text: str) -> TodoItem:
+        """Replace the text of the item at ``index`` and persist the change.
+
+        Empty or whitespace-only text is rejected before anything is
+        loaded or persisted. Saving unchanged text (ignoring surrounding
+        whitespace) is a no-op: nothing is written.
+        """
+        stripped = (text or "").strip()
+        if not stripped:
+            raise ValueError("todo item text must not be empty")
+
+        todo_list = self.open_list(name)
+        item = todo_list.items[index]
+        if item.text == stripped:
+            return item
+
+        todo_list.edit(index, stripped)
+        self.store.save(name, [(i.text, i.done) for i in todo_list.items])
+        return todo_list.items[index]
+
     def remove_item(self, name: str, index: int) -> TodoItem:
         """Remove the item at ``index`` and persist the change."""
 
@@ -262,6 +282,12 @@ class TodoApp:
         )
         self.current_list: str | None = None
         self.settings_window = None
+        # Edit dialog state (None while no edit modal is open).
+        self._edit_window = None
+        self._edit_index: int | None = None
+        self._edit_entry = None
+        self._edit_save_btn = None
+        self._edit_cancel_btn = None
         self._item_rows: list[tuple] = []
         self._palette: dict | None = None
         # entry widget -> its placeholder text (empty fields show this muted
@@ -285,6 +311,10 @@ class TodoApp:
         # Cached trash-bin icon (pre-sized 18x18 asset; source 512x512 kept in assets/).
         self._trash_image = tk.PhotoImage(
             file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "trash_18.png")
+        )
+        # Cached pencil edit icon (pre-sized 18x18 asset; source 512x512 kept in assets/).
+        self._edit_image = tk.PhotoImage(
+            file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "edit_18.png")
         )
 
         self._build_ui()
@@ -1000,6 +1030,13 @@ class TodoApp:
             del_ctrl.pack(side=tk.RIGHT, padx=(6, 4))
             del_ctrl.bind("<Button-1>", lambda e, i=index: self._on_delete_item(i))
 
+            # Edit (pencil) icon: packed after the trash icon, so with the
+            # same side=RIGHT it lands strictly to its left.
+            edit_kwargs = {"bg": row_bg} if row_bg is not None else {}
+            edit_ctrl = tk.Label(row, image=self._edit_image, cursor="hand2", **edit_kwargs)
+            edit_ctrl.pack(side=tk.RIGHT, padx=(6, 0))
+            edit_ctrl.bind("<Button-1>", lambda e, i=index: self._on_edit_item(i))
+
             label_font = base_font.copy()
             if item.done:
                 label_font.config(overstrike=1)
@@ -1017,7 +1054,7 @@ class TodoApp:
             )
             label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-            self._item_rows.append((var, cb, label, del_ctrl))
+            self._item_rows.append((var, cb, label, del_ctrl, edit_ctrl))
 
     def _on_toggle_item(self, index: int) -> None:
         if self.current_list is None:
@@ -1035,6 +1072,84 @@ class TodoApp:
             return
         self.controller.remove_item(self.current_list, index)
         self._refresh_items()
+
+    def _on_edit_item(self, index: int) -> None:
+        """Open the modal edit dialog for the item at ``index``."""
+        if self.current_list is None:
+            return
+        self._open_edit_dialog(index)
+
+    def _open_edit_dialog(self, index: int) -> None:
+        """Open a theme-aware modal dialog to edit the item's text.
+
+        Window styling follows the other dialogs (Toplevel, theme bg,
+        transient). The entry starts pre-populated with the item's current
+        text. ``save`` calls ``controller.edit_item`` for this item, then
+        closes the dialog and refreshes the list; empty/whitespace-only
+        input raises ValueError in the controller and persists nothing, but
+        the dialog still closes. ``cancel`` closes the dialog with no
+        changes.
+        """
+        import tkinter as tk
+        from tkinter import ttk
+
+        win = tk.Toplevel(self.root)
+        if self._palette is not None:
+            win.configure(bg=self._palette["bg"])
+        win.title("Edit item")
+        win.transient(self.root)
+
+        row = ttk.Frame(win, padding=10)
+        row.pack(fill=tk.X)
+        entry = ttk.Entry(row)
+        entry.pack(fill=tk.X)
+        entry.insert(
+            0, self.controller.open_list(self.current_list).items[index].text
+        )
+
+        bottom = ttk.Frame(win, padding=(10, 8))
+        bottom.pack(side=tk.BOTTOM)
+        save_btn = ttk.Button(bottom, text="save")
+        save_btn.pack(side=tk.RIGHT, padx=(6, 0))
+        cancel_btn = ttk.Button(bottom, text="cancel")
+        cancel_btn.pack(side=tk.RIGHT)
+
+        save_btn.config(command=self._on_edit_save)
+        cancel_btn.config(command=self._close_edit_dialog)
+        entry.bind("<Return>", lambda _e: self._on_edit_save())
+        win.protocol("WM_DELETE_WINDOW", self._close_edit_dialog)
+
+        self._edit_window = win
+        self._edit_index = index
+        self._edit_entry = entry
+        self._edit_save_btn = save_btn
+        self._edit_cancel_btn = cancel_btn
+
+        win.grab_set()
+        win.update()
+
+    def _on_edit_save(self) -> None:
+        """Persist the entry text via controller.edit_item, then close."""
+        if self._edit_window is None or self.current_list is None:
+            return
+        try:
+            self.controller.edit_item(
+                self.current_list, self._edit_index, self._edit_entry.get()
+            )
+        except ValueError:
+            pass  # empty/whitespace-only text: nothing is persisted
+        self._close_edit_dialog()
+        self._refresh_items()
+
+    def _close_edit_dialog(self) -> None:
+        win = self._edit_window
+        self._edit_window = None
+        self._edit_index = None
+        self._edit_entry = None
+        self._edit_save_btn = None
+        self._edit_cancel_btn = None
+        if win is not None and win.winfo_exists():
+            win.destroy()
 
     def _on_add_item(self) -> None:
         if self.current_list is None:

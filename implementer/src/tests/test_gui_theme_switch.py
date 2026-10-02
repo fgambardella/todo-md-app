@@ -47,7 +47,7 @@ def test_item_rows_follow_theme_switches(tmp_path):
         app._refresh_items()
         root.update()
 
-        _var, checkbutton, label, _del = app._item_rows[1]
+        _var, checkbutton, label, _del, _edit = app._item_rows[1]
         assert label.cget("text") == "Alpha"
         row_frame = checkbutton.master
 

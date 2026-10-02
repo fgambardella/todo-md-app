@@ -21,7 +21,7 @@ def test_delete_item_removes_from_ui_and_file(tmp_path):
 
         assert len(app._item_rows) == 2
         for row in app._item_rows:
-            assert len(row) == 4
+            assert len(row) == 5
             delete_button = row[3]
             # 4th element is a widget
             assert delete_button is not None

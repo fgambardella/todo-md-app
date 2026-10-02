@@ -206,7 +206,7 @@ def test_label_readability_after_switch(tmp_path):
         app._on_toggle_theme()  # light -> dark
         root.update()
 
-        _var, _cb, label, _del = app._item_rows[0]
+        _var, _cb, label, _del, _edit = app._item_rows[0]
         fg = lum(root, label.cget("foreground"))
         bg = lum(root, label.cget("bg"))
         assert abs(fg - bg) >= 0.5
