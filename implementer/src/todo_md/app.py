@@ -169,8 +169,10 @@ class TodoController:
     def open_list(self, name: str) -> TodoList:
         """Load a list into a TodoList of TodoItem objects."""
         todo_list = TodoList(name=name)
-        for text, done in self.store.load(name):
-            todo_list.items.append(TodoItem(text=text, done=done))
+        for text, done, description in self.store.load(name):
+            todo_list.items.append(
+                TodoItem(text=text, done=done, description=description)
+            )
         return todo_list
 
     def create_list(self, name: str) -> None:
@@ -188,7 +190,9 @@ class TodoController:
     def _load_and_save(self, name: str, mutate) -> TodoList:
         todo_list = self.open_list(name)
         mutate(todo_list)
-        self.store.save(name, [(item.text, item.done) for item in todo_list.items])
+        self.store.save(
+            name, [(item.text, item.done, item.description) for item in todo_list.items]
+        )
         return todo_list
 
     def add_item(self, name: str, text: str) -> TodoItem:
@@ -214,24 +218,30 @@ class TodoController:
         self._load_and_save(name, _mutate)
         return toggled
 
-    def edit_item(self, name: str, index: int, text: str) -> TodoItem:
-        """Replace the text of the item at ``index`` and persist the change.
+    def edit_item(
+        self, name: str, index: int, text: str, description: str = ''
+    ) -> TodoItem:
+        """Replace the text (and optionally the description) at ``index``.
 
         Empty or whitespace-only text is rejected before anything is
-        loaded or persisted. Saving unchanged text (ignoring surrounding
-        whitespace) is a no-op: nothing is written.
+        loaded or persisted. Saving unchanged text *and* unchanged
+        description (ignoring surrounding whitespace) is a no-op: nothing
+        is written; a description-only change is still persisted.
         """
         stripped = (text or "").strip()
         if not stripped:
             raise ValueError("todo item text must not be empty")
+        stripped_desc = (description or "").strip()
 
         todo_list = self.open_list(name)
         item = todo_list.items[index]
-        if item.text == stripped:
+        if item.text == stripped and item.description == stripped_desc:
             return item
 
-        todo_list.edit(index, stripped)
-        self.store.save(name, [(i.text, i.done) for i in todo_list.items])
+        todo_list.edit(index, stripped, stripped_desc)
+        self.store.save(
+            name, [(i.text, i.done, i.description) for i in todo_list.items]
+        )
         return todo_list.items[index]
 
     def remove_item(self, name: str, index: int) -> TodoItem:
