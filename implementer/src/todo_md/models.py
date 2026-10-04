@@ -13,6 +13,7 @@ class TodoItem:
     text: str
     done: bool = False
     created: float = 0.0
+    description: str = ''
 
     def __post_init__(self) -> None:
         if self.created == 0.0:
@@ -57,17 +58,20 @@ class TodoList:
         """Remove and return the item at ``index``."""
         return self.items.pop(index)
 
-    def edit(self, index: int, text: str) -> TodoItem:
+    def edit(self, index: int, text: str, description: str = '') -> TodoItem:
         """Replace the text of the item at ``index`` and return it.
 
         The text is stripped; a ValueError is raised if the resulting
-        text is empty.
+        text is empty. The description is stripped (internal newlines
+        are preserved) and stored on the item; a blank description
+        becomes an empty string.
         """
         stripped = text.strip()
         if not stripped:
             raise ValueError("todo item text must not be empty")
         item = self.items[index]
         item.text = stripped
+        item.description = description.strip()
         return item
 
     def rename(self, new_name: str) -> None:
