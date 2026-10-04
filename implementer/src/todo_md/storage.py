@@ -10,6 +10,8 @@ import tempfile
 __all__ = ["MarkdownListStore", "relocate_lists"]
 
 _CHECKBOX_RE = re.compile(r"^- \[( |x|X)\](?: (.*))?$")
+_HEADER_RE = re.compile(r"^#")
+_CONTINUATION_INDENT = "  "
 _BAD_NAME_RE = re.compile(r"[^A-Za-z0-9_-]")
 
 
@@ -86,26 +88,62 @@ class MarkdownListStore:
                 names.append(entry[: -len(".md")])
         return sorted(names)
 
-    def load(self, name: str) -> list[tuple[str, bool]]:
-        """Parse `<name>.md` into (text, done) tuples; [] if file missing."""
+    def load(self, name: str) -> list[tuple[str, bool, str]]:
+        """Parse `<name>.md` into (text, done, description) tuples; [] if missing.
+
+        A checkbox line starts an item; following lines indented by two or
+        more spaces (up to the next checkbox or header line, or any other
+        non-indented line) form the item's description, de-indented, joined
+        with newlines, and stripped. Continuation lines before the first
+        checkbox are ignored.
+        """
         path = self._path(name)
         if not os.path.isfile(path):
             return []
-        items: list[tuple[str, bool]] = []
+        items: list[tuple[str, bool, str]] = []
+        current: tuple[str, bool, list[str]] | None = None
+        collecting = False
+
+        def close_current() -> None:
+            nonlocal current, collecting
+            if current is not None:
+                text, done, desc_lines = current
+                items.append((text, done, "\n".join(desc_lines).strip()))
+            current = None
+            collecting = False
+
         with open(path, "r", encoding="utf-8") as fh:
             for line in fh:
                 line = line.rstrip("\r\n")
                 m = _CHECKBOX_RE.match(line)
                 if m:
-                    items.append((m.group(2) or "", m.group(1).lower() == "x"))
+                    close_current()
+                    current = (m.group(2) or "", m.group(1).lower() == "x", [])
+                    collecting = True
+                    continue
+                if _HEADER_RE.match(line):
+                    close_current()
+                    continue
+                if collecting and line.startswith(_CONTINUATION_INDENT):
+                    current[2].append(line[len(_CONTINUATION_INDENT):])
+                else:
+                    collecting = False
+        close_current()
         return items
 
-    def save(self, name: str, items: list[tuple[str, bool]]) -> None:
-        """Write items atomically as a markdown file (temp + os.replace)."""
+    def save(self, name: str, items: list[tuple[str, bool, str]]) -> None:
+        """Write items atomically as a markdown file (temp + os.replace).
+
+        Each non-empty description line is written as two spaces + line
+        directly under its checkbox line; an empty description adds no lines.
+        """
         path = self._path(name)
         lines = ["# " + name]
-        for text, done in items:
+        for text, done, description in items:
             lines.append("- [x] " + text if done else "- [ ] " + text)
+            for desc_line in description.split("\n"):
+                if desc_line:
+                    lines.append(_CONTINUATION_INDENT + desc_line)
         content = "\n".join(lines) + "\n"
 
         dir_name = os.path.dirname(path)

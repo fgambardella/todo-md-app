@@ -22,7 +22,11 @@ def test_init_creates_dir(tmp_path):
 
 
 def test_save_load_round_trip(store):
-    items = [("buy milk", False), ("write tests", True), ("  spaced  text  ", False)]
+    items = [
+        ("buy milk", False, ""),
+        ("write tests", True, "coverage for storage"),
+        ("  spaced  text  ", False, "keep\n  extra indent"),
+    ]
     store.save("groceries", items)
     assert store.load("groceries") == items
 
@@ -47,10 +51,81 @@ def test_parse_hand_written_md(store, tmp_path):
     )
     (tmp_path / "data" / "todo.md").write_text(raw, encoding="utf-8")
     assert store.load("todo") == [
-        ("eggs", False),
-        ("uppercase done", True),
-        ("", False),
+        ("eggs", False, ""),
+        ("uppercase done", True, ""),
+        ("", False, ""),
     ]
+
+
+def test_load_multi_line_description(store, tmp_path):
+    raw = (
+        "# Tasks\n"
+        "- [ ] deploy\n"
+        "  step one\n"
+        "    deeper indent kept\n"
+        "  step three\n"
+        "- [x] done item\n"
+    )
+    (tmp_path / "data" / "tasks.md").write_text(raw, encoding="utf-8")
+    assert store.load("tasks") == [
+        ("deploy", False, "step one\n  deeper indent kept\nstep three"),
+        ("done item", True, ""),
+    ]
+
+
+def test_stray_continuation_before_first_checkbox_ignored(store, tmp_path):
+    raw = (
+        "# List\n"
+        "  stray continuation\n"
+        "  another stray\n"
+        "- [ ] item\n"
+        "  real description\n"
+    )
+    (tmp_path / "data" / "l.md").write_text(raw, encoding="utf-8")
+    assert store.load("l") == [("item", False, "real description")]
+
+
+def test_description_stops_at_header_checkbox_and_blank(store, tmp_path):
+    raw = (
+        "# Top\n"
+        "- [ ] a\n"
+        "  desc a\n"
+        "# Section\n"
+        "- [x] b\n"
+        "  desc b\n"
+        "  more b\n"
+        "\n"
+        "  orphan after blank\n"
+        "- [ ] c\n"
+    )
+    (tmp_path / "data" / "l.md").write_text(raw, encoding="utf-8")
+    assert store.load("l") == [
+        ("a", False, "desc a"),
+        ("b", True, "desc b\nmore b"),
+        ("c", False, ""),
+    ]
+
+
+def test_save_exact_output_mixed_descriptions(store, tmp_path):
+    items = [
+        ("plain", False, ""),
+        ("with description", True, "first line\nsecond line"),
+        ("multiline", False, "a\nb\nc"),
+    ]
+    store.save("mixed", items)
+    data = (tmp_path / "data" / "mixed.md").read_text(encoding="utf-8")
+    assert data == (
+        "# mixed\n"
+        "- [ ] plain\n"
+        "- [x] with description\n"
+        "  first line\n"
+        "  second line\n"
+        "- [ ] multiline\n"
+        "  a\n"
+        "  b\n"
+        "  c\n"
+    )
+    assert store.load("mixed") == items
 
 
 def test_create_and_delete(store):
@@ -88,13 +163,13 @@ def test_name_sanitization(store, tmp_path):
     assert files == ["my_list__v2__.md"]
     assert store.lists() == ["my_list__v2__"]
     # original (unsanitized) name must map to the same file
-    store.save(weird, [("a", True)])
-    assert store.load(weird) == [("a", True)]
+    store.save(weird, [("a", True, "")])
+    assert store.load(weird) == [("a", True, "")]
     assert files and store.lists() == ["my_list__v2__"]
 
 
 def test_save_has_header_no_crlf_trailing_newline(store, tmp_path):
-    store.save("note", [("one", False)])
+    store.save("note", [("one", False, "")])
     data = (tmp_path / "data" / "note.md").read_bytes()
     assert b"\r" not in data
     assert data.endswith(b"\n")
@@ -104,12 +179,12 @@ def test_save_has_header_no_crlf_trailing_newline(store, tmp_path):
 
 def test_atomic_replace_no_partial_content(store, tmp_path):
     path = tmp_path / "data" / "big.md"
-    store.save("big", [(f"item {i}", i % 2 == 0) for i in range(50)])
+    store.save("big", [(f"item {i}", i % 2 == 0, "") for i in range(50)])
     before = path.read_bytes()
 
     # Overwrite with a much shorter payload: file must swap atomically,
     # never ending up with a partial/truncated mix of the two contents.
-    store.save("big", [("only", True)])
+    store.save("big", [("only", True, "")])
     after = path.read_bytes()
     assert after == b"# big\n- [x] only\n"
     assert after != before
@@ -141,7 +216,7 @@ def test_atomic_replace_no_partial_content(store, tmp_path):
     os.fdopen = lambda *a, **k: ExplodingWriter(original_fdopen(*a, **k))
     try:
         with pytest.raises(IOError):
-            store.save("big", [(f"item {i}", False) for i in range(50)])
+            store.save("big", [(f"item {i}", False, "") for i in range(50)])
     finally:
         os.fdopen = original_fdopen
 
