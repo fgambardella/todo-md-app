@@ -28,12 +28,32 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-- GUI change request: open edit todo item modal when double click is detected on the todo item text and item is not completed.
-- GUI change request: add a description text box in the edit todo item modal. The todo item description should be stored together with the todo item, as a sub element, in a human readable way in the .md file.
+- **Task 45 (S): Open the item edit modal on double-click of an unfinished item**
+  - Branch: `implementer/45-double-click-edit` (base and integration branch: `main`).
+  - Scope: GUI only, `implementer/src/todo_md/app.py` plus GUI tests. No model, storage, settings, or controller changes; reuse the existing edit-modal path already used by the edit icon.
+  - Acceptance criteria:
+    1. A double-click (two consecutive `<ButtonPress-1>` events within Tk's double-click window, or Tk's `<Double-Button-1>` binding) on the text of an **unfinished** item opens the existing pre-populated modal edit dialog.
+    2. Double-clicking a **completed** item opens no dialog; the existing single-click toggle behavior is unchanged.
+    3. The edit icon still opens the modal exactly as before; modal Save/Cancel/empty-input behavior is unchanged.
+    4. No persisted content changes occur merely from clicking; edits persist only through the existing modal Save path.
+    5. The dialog guard in `tests/conftest.py` remains green: no unexpected dialogs in any existing test.
+  - Tests to write/update: new `implementer/src/tests/test_gui_double_click.py` (unfinished item opens modal, completed item does not, single-click toggle still works, Save persists text) and run existing `tests/test_gui_edit.py` to guard regressions.
+  - Commands (from `implementer/`):
+    - `(cd src && .venv/bin/python -m pytest tests/test_gui_double_click.py tests/test_gui_edit.py -v)`
+    - `(cd src && .venv/bin/python -m pytest tests -v)` (full suite before handoff)
+  - Prompt for the Implementer:
+    > You are the Implementer agent. Assigned branch: `implementer/45-double-click-edit`; base and integration branch: `main`.
+    > First tool call: run `../architect/tools/implementer-run.sh` (no arguments). All subsequent Bash commands MUST go through that wrapper, and you MUST follow the Implementer Mandatory Execution Clock phase rules. Executing the read-only harness script is permitted; modifying it is forbidden.
+    > Before editing: verify the current branch is `implementer/45-double-click-edit` and inspect the working tree (`git status --short`); stop and report if unexpected.
+    > Task: in `implementer/src/todo_md/app.py`, make a double-click on the text of an **unfinished** todo item open the existing pre-populated modal edit dialog (same path the edit icon uses). Double-clicking a **completed** item must open no dialog. Do not change single-click toggle, edit-icon, modal Save/Cancel, storage, models, controller, or settings. Keep changes minimal and within `implementer/src/todo_md/app.py` and new/updated tests under `implementer/src/tests/`.
+    > Tests: add `implementer/src/tests/test_gui_double_click.py` covering: double-click on an unfinished item opens the pre-populated modal; Save persists the edited text to the `.md` file; double-click on a completed item opens no dialog (rely on the `tests/conftest.py` dialog guard); single-click toggle still works; the edit icon path is unchanged. Use the shared conftest fixtures, isolated data/config dirs, withdraw/update/destroy owned roots including failure paths; no human input, no skips/xfails.
+    > Run from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_gui_double_click.py tests/test_gui_edit.py -v)` then the full suite `(cd src && .venv/bin/python -m pytest tests -v)`. All must pass.
+    > Commit completed work on `implementer/45-double-click-edit` and report branch name and commit hash in the handoff.
+    > Forbidden: creating/switching/merging/rebasing/renaming/deleting/pushing branches; committing to `main`; broad staging or destructive working-tree operations; any change under `../architect/`, `implementer/AGENTS.md`, or the repository root.
 
 ## Queue
 
-None.
+- Task 46 (M): Description field for todo items — a description text box in the edit modal, stored with the item as a human-readable sub-element in the `.md` file (domain, storage, controller, GUI, tests). Unexpanded; plan and size micro-tasks when promoted.
 
 ## Active Blockers
 
