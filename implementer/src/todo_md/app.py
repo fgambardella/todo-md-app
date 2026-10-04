@@ -1053,6 +1053,10 @@ class TodoApp:
                 **label_kwargs,
             )
             label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            label.bind(
+                "<Double-Button-1>",
+                lambda _e, i=index: self._on_item_double_click(i),
+            )
 
             self._item_rows.append((var, cb, label, del_ctrl, edit_ctrl))
 
@@ -1078,6 +1082,19 @@ class TodoApp:
         if self.current_list is None:
             return
         self._open_edit_dialog(index)
+
+    def _on_item_double_click(self, index: int) -> None:
+        """Open the edit dialog when an unfinished item's text is double-clicked.
+
+        Mirrors the edit-icon path (same pre-populated modal). Completed
+        items ignore the double-click so no dialog opens for them.
+        """
+        if self.current_list is None:
+            return
+        item = self.controller.open_list(self.current_list).items[index]
+        if item.done:
+            return
+        self._on_edit_item(index)
 
     def _open_edit_dialog(self, index: int) -> None:
         """Open a theme-aware modal dialog to edit the item's text.
