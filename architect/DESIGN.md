@@ -15,7 +15,7 @@
 
 - `implementer/src/todo_md/models.py` — domain: `TodoItem`, `TodoList` with validated `add_item`, `edit`, `toggle`, `remove`, `rename`.
 - `implementer/src/todo_md/storage.py` — persistence: `MarkdownListStore`, one `<Name>.md` per list, atomic writes, name sanitization.
-- `implementer/src/todo_md/app.py` — `TodoController` (UI-agnostic view-model; every mutation persists immediately) and `TodoApp` (Tkinter GUI: sidebar list management, checkbutton item rows with edit/trash icons, add entry, modal edit dialog, confirmations).
+- `implementer/src/todo_md/app.py` — `TodoController` (UI-agnostic view-model; every mutation persists immediately) and `TodoApp` (Tkinter GUI: sidebar list management, checkbutton item rows with edit/trash icons, add entry, modal edit dialog (edit icon or double-click on unfinished item text), confirmations).
 - `implementer/src/todo_md/settings.py` — headless `Settings` load/save and theme resolution; settings GUI has Save/Cancel, directory change with optional list movement.
 - `implementer/src/todo_md/version.py` — headless `get_version()` from `todo_md/VERSION`.
 - `implementer/src/todo_md/__main__.py` — entry point `run()` wiring controller + GUI.
