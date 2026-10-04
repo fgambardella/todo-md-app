@@ -28,11 +28,19 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 
 ## Active Task
 
-None.
+- **Task 46 (M)** — Description field for todo items.
+- Branch: `implementer/46-item-description` (base and integration: `main`).
+- Scope: `TodoItem.description` (str, default `""`); `TodoList.edit` sets title + description; storage round-trips description as two-space-indented continuation lines under each checkbox line (legacy files parse as empty description; empty description writes no extra lines); controller persists description through `edit_item`; edit modal gains a pre-populated description text box (Save persists both fields; Cancel or empty title stays a no-op).
+- Micro-tasks (sequential, same branch, prior commit as start state): 46.1 domain (`todo_md/models.py`, `tests/test_models.py`); 46.2 storage + controller (3-tuple `(text, done, description)` contract, `tests/test_storage.py`, `tests/test_controller.py`); 46.3 GUI modal description box (`tests/test_gui_edit.py`, `tests/test_gui_double_click.py`).
+- Acceptance: title remains required non-empty after strip; description stored stripped, `""` when blank, internal newlines preserved; legacy `.md` without descriptions loads unchanged; no spurious lines written for empty descriptions; every mutation persists immediately; full suite green.
+- Required tests: full suite plus targeted `tests/test_models.py`, `tests/test_storage.py`, `tests/test_controller.py`, `tests/test_gui_edit.py`, `tests/test_gui_double_click.py` (subset per micro-task).
+- Test commands from `implementer/`: full `(cd src && .venv/bin/python -m pytest tests -v)`; targeted `(cd src && .venv/bin/python -m pytest tests/<files>.py -v)`.
+- Prompt (current micro-task 46.1, domain):
+  > Task 46, micro-task 46.1 (domain only): add a description field to `TodoItem` in `implementer/src/todo_md/models.py`. You are on branch `implementer/46-item-description` (base and integration branch: `main`). Verify with `git branch --show-current` and inspect `git status --short` before editing. First tool call: run `../architect/tools/implementer-run.sh` without arguments; use that wrapper for every subsequent Bash command and follow the Mandatory Execution Clock phase rules; the harness is read-only, never modify it. Restrict changes to `implementer/src/todo_md/models.py` and `implementer/src/tests/test_models.py`; never modify anything under `../architect/` or the repo root. No branch creation/switching/merging/pushing; never commit to `main`; no broad staging or destructive git operations. Implementation: add `description: str = ""` to `TodoItem` (keep field order so existing positional construction keeps working); extend `TodoList.edit(self, index, text, description: str = "")` to set `item.description` as well — text validation unchanged (stripped, non-empty else ValueError); description stored as `description.strip()` with internal newlines preserved (blank/whitespace-only becomes `""`). Do not change `add_item`, `toggle`, `remove`, or `rename`. Tests in `tests/test_models.py`: default description is `""`; `edit` sets title and description; whitespace-only description becomes `""`; multi-line description preserved internally; empty text still raises ValueError; two-argument `edit(index, text)` still works. Commands from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/test_models.py -v)` and `(cd src && .venv/bin/python -m pytest tests -v)`. Commit completed work to `implementer/46-item-description`; the handoff must state RESULT: SUCCESS/FAILURE, the branch name, and the commit hash (COMMIT: NONE only if nothing changed).
 
 ## Queue
 
-- Task 46 (M): Description field for todo items — a description text box in the edit modal, stored with the item as a human-readable sub-element in the `.md` file (domain, storage, controller, GUI, tests). Unexpanded; plan and size micro-tasks when promoted.
+None.
 
 ## Active Blockers
 

@@ -13,9 +13,9 @@
 
 ## Component Architecture
 
-- `implementer/src/todo_md/models.py` — domain: `TodoItem`, `TodoList` with validated `add_item`, `edit`, `toggle`, `remove`, `rename`.
+- `implementer/src/todo_md/models.py` — domain: `TodoItem` (text, done, created, description) and `TodoList` with validated `add_item`, `edit` (title + description), `toggle`, `remove`, `rename`.
 - `implementer/src/todo_md/storage.py` — persistence: `MarkdownListStore`, one `<Name>.md` per list, atomic writes, name sanitization.
-- `implementer/src/todo_md/app.py` — `TodoController` (UI-agnostic view-model; every mutation persists immediately) and `TodoApp` (Tkinter GUI: sidebar list management, checkbutton item rows with edit/trash icons, add entry, modal edit dialog (edit icon or double-click on unfinished item text), confirmations).
+- `implementer/src/todo_md/app.py` — `TodoController` (UI-agnostic view-model; every mutation persists immediately) and `TodoApp` (Tkinter GUI: sidebar list management, checkbutton item rows with edit/trash icons, add entry, modal edit dialog (title + description; edit icon or double-click on unfinished item text), confirmations).
 - `implementer/src/todo_md/settings.py` — headless `Settings` load/save and theme resolution; settings GUI has Save/Cancel, directory change with optional list movement.
 - `implementer/src/todo_md/version.py` — headless `get_version()` from `todo_md/VERSION`.
 - `implementer/src/todo_md/__main__.py` — entry point `run()` wiring controller + GUI.
@@ -25,8 +25,8 @@
 ## Data Models and Flow
 
 - Flow: GUI → `TodoController` → models → `MarkdownListStore` → `.md` files; store re-read after each mutation drives UI refresh.
-- `TodoItem` owns text, completion state, creation timestamp; completed items keep completion order above unfinished items.
-- Markdown format: `# Name` header, `- [ ]` / `- [x]` lines; hidden/filtered items are never deleted from disk.
+- `TodoItem` owns text, description, completion state, creation timestamp; completed items keep completion order above unfinished items.
+- Markdown format: `# Name` header, `- [ ]` / `- [x]` lines; an item description (optional, multi-line) is stored as two-space-indented continuation lines directly under its checkbox line; legacy files without them parse as empty description; hidden/filtered items are never deleted from disk.
 - Settings persist a full payload (theme, completed-item filter count, lists directory) and apply live; relocation failures leave recoverable files and keep the old directory usable.
 
 ## External Interfaces
