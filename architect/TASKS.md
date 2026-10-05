@@ -23,40 +23,12 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - Directory changes apply live with optional list movement and an explicit confirmation; popup Cancel retains the directory while saving other settings. Populated destinations are accepted, collisions are rejected without overwriting, equivalent paths are harmless, and configuration stays fixed.
 - Relocation failures preserve recoverable files and refresh the active view; failed settings persistence keeps the destination usable and supports retry without repeating moves, pending theme/filter edits remain unapplied.
 - Automated GUI tests intercept unexpected dialogs and verify cleanup after failures without human interaction.
-- Item rows have an edit icon left of the trash; the pre-populated modal persists text to the `.md` file on Save, while Cancel or empty input is a no-op. Double-clicking an unfinished item's text opens the same modal; completed items ignore double-clicks.
+- Item rows have an edit icon left of the trash; items can carry an optional multi-line description stored as indented continuation lines in the list's `.md` file (legacy files parse as empty description). The pre-populated modal edits title and description and persists both on Save, while Cancel or an empty title is a no-op. Double-clicking an unfinished item's text opens the same modal; completed items ignore double-clicks.
 - Build and release scripts produce a launch-tested Apple Silicon app bundle and versioned distributable ZIP.
 
 ## Active Task
 
-- **Task 46 (M)** — Description field for todo items.
-- Branch: `implementer/46-item-description` (base and integration: `main`).
-- Scope: `TodoItem.description` (str, default `""`); `TodoList.edit` sets title + description; storage round-trips description as two-space-indented continuation lines under each checkbox line (legacy files parse as empty description; empty description writes no extra lines); controller persists description through `edit_item`; edit modal gains a pre-populated description text box (Save persists both fields; Cancel or empty title stays a no-op).
-- Micro-tasks (sequential, same branch, prior commit as start state): 46.1 domain (done, `080f035`); 46.2a storage (done, `427a3b5`); 46.2b1 controller code (done, `5207baa`); 46.2b2 controller tests (done, `f594d35`); 46.2b3 remaining test files (done, `a8a133b`); 46.3 GUI modal description box (`tests/test_gui_edit.py`, `tests/test_gui_double_click.py`).
-- Acceptance: title remains required non-empty after strip; description stored stripped, `""` when blank, internal newlines preserved; legacy `.md` without descriptions loads unchanged; no spurious lines written for empty descriptions; every mutation persists immediately; full suite green.
-- Required tests: full suite plus targeted `tests/test_models.py`, `tests/test_storage.py`, `tests/test_controller.py`, `tests/test_gui_edit.py`, `tests/test_gui_double_click.py` (subset per micro-task).
-- Test commands from `implementer/`: full `(cd src && .venv/bin/python -m pytest tests -v)`; targeted `(cd src && .venv/bin/python -m pytest tests/<files>.py -v)`.
-- Checkpoint: 46.1 `080f035`; 46.2a `427a3b5`; 46.2b1 `5207baa`; 46.2b2 `f594d35`; 46.2b3 `a8a133b` — executed externally (4 in-harness `pi` attempts all hit the 1,200s timeout with 0-byte logs, no work lost); independently verified: only the 4 test files + VERSION bump changed, no weakened/skipped assertions, full suite 335 passed / 2 skipped. 46.3 is the last micro-task; prompt prepared at `/tmp/implementer-prompt-46.3-external.txt` (external hand-off mode, same as 46.2b3, due to `pi` slowness).
-- Files in /tmp from previous executions:
-  1) implementer-46.2.log
-  2) implementer-prompt-46.2.txt
-  3) implementer-prompt-46.2a.txt
-  4) implementer-prompt-46.2a-v2.txt
-  5) implementer-46.2a-v2.log
-  6) implementer-prompt-46.2b.txt
-  7) implementer-46.2b.log
-  8) implementer-prompt-46.2b1.txt
-  9) implementer-46.2b1.log
-  10) implementer-prompt-46.2b2.txt
-  11) implementer-46.2b2.log
-  12) implementer-prompt-46.2b3.txt
-  13) implementer-46.2b3-v2.log
-  14) implementer-prompt-46.2b3-v2.txt
-  15) implementer-46.2b3a.log
-  16) implementer-prompt-46.2b3a.txt
-  17) implementer-46.2b3a-attempt2.log
-  18) implementer-prompt-46.2b3-external.txt
-  19) implementer-prompt-46.3-external.txt (keep until verification done)
-  Check the content and delete them after a successful completion.
+None.
 
 ## Queue
 
@@ -64,12 +36,12 @@ None.
 
 ## Active Blockers
 
-- In-harness `pi` child runs repeatedly exceed the 1,200s hard timeout even on narrow single-file tasks (trivial prompt probe took 46s); 0-byte logs, no commits. 46.2b3 is therefore executed externally by the user with a faster model; subsequent slow micro-tasks may need the same treatment.
+None.
 
 ## Recently Completed
 
+- 46: Item description field (domain, storage, controller, full test migration, GUI edit modal description box); independently verified and approved; `ca02ac4bad7c5ce6964e85ffec10bd57be65d635`.
 - 45: Double-click on unfinished item text opens the modal edit dialog (GUI-only, stored-index safe); independently verified and approved; `160c423ff1a933a5f67975dbdb9f7fc7d37008e3`.
 - 44: Per-item edit icon left of trash and modal edit dialog (headless `edit_item` + GUI); independently verified and approved; `3181f134a4f3f25b0ba2cd0fb3a8c8a5c04db406`.
 - 43: Withdrawn structural long-label test and lifecycle regression; independently verified and approved; `47020e50c32afa52fb32296b87bc9991d18b3989`.
 - 42: Input caret contrast across themes; independently verified and approved; `dceb909362fb036ec69712139c27492d86c9b5d3`.
-- 41: Persisted completion order and safe filtered GUI callbacks; independently verified and approved; `5b9c4457bf25fc6b682ffd1e14e243577789e81c`.
