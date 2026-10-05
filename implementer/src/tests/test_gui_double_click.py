@@ -108,6 +108,7 @@ def test_double_click_completed_opens_no_dialog(tmp_path):
         # No modal may open for a completed item; nothing to close.
         assert app._edit_window is None, "no dialog may open for completed items"
         assert app._edit_entry is None
+        assert app._edit_desc_text is None
     finally:
         app.root.destroy()
 
@@ -152,6 +153,9 @@ def test_edit_icon_path_unchanged(tmp_path):
         assert app._edit_window is not None, "edit icon should open the dialog"
         assert app._edit_window.title() == "Edit item"
         assert app._edit_entry.get() == "Unfinished task"
+        # Description box is part of the same modal on the icon path.
+        assert isinstance(app._edit_desc_text, tk.Text)
+        assert app._edit_desc_text.get("1.0", "end-1c") == ""
     finally:
         app._close_edit_dialog()
         app.root.destroy()

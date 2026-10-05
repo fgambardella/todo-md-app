@@ -486,11 +486,12 @@ def test_save_unchanged_custom_dir_persists_normalized_path(make_app, tmp_path):
 def test_save_completed_visible_persists_and_filters(make_app, tmp_path):
     data_dir = str(tmp_path / "data")
     app = make_app({"lists_dir": data_dir})
-    items = [("a", False), ("b", False), ("c", True), ("d", True), ("e", True), ("f", True)]
+    items = [("a", False, ""), ("b", False, ""), ("c", True, ""),
+             ("d", True, ""), ("e", True, ""), ("f", True, "")]
     app.controller.store.save("L", items)
     app.refresh_lists(select_first=True)
     app.root.update()
-    _assert_view(app, ["L"], "L", [items[i] for i in (2, 3, 4, 5, 0, 1)])
+    _assert_view(app, ["L"], "L", [items[i][:2] for i in (2, 3, 4, 5, 0, 1)])
 
     _open(app)
     app._settings_completed_var.set(1)
@@ -843,7 +844,7 @@ def test_cancel_from_default_preserves_null_and_applies_other_edits(
     make_app, tmp_path, default_dir
 ):
     app = make_app()
-    app.controller.store.save("work", [("task", False)])
+    app.controller.store.save("work", [("task", False, "")])
     target = tmp_path / "target"
     _open(app)
     app._settings_theme_var.set("light")

@@ -187,3 +187,52 @@ def test_created_defaults_to_recent_timestamp():
 def test_explicit_created_is_kept():
     item = TodoItem(text="x", created=1234.5)
     assert item.created == 1234.5
+
+
+def test_description_defaults_to_empty_string():
+    assert TodoItem(text="x").description == ''
+    assert TodoItem(text="x", done=True, created=1.0).description == ''
+
+
+def test_edit_sets_title_and_description():
+    tl = TodoList(name="test")
+    item = tl.add_item("old title")
+    edited = tl.edit(0, "new title", "more detail")
+    assert edited is item
+    assert item.text == "new title"
+    assert item.description == "more detail"
+
+
+def test_edit_whitespace_only_description_becomes_empty():
+    tl = TodoList(name="test")
+    tl.add_item("task")
+    tl.edit(0, "task", "   \n  ")
+    assert tl.items[0].description == ''
+
+
+def test_edit_preserves_multiline_description_internally():
+    tl = TodoList(name="test")
+    tl.add_item("task")
+    tl.edit(0, "task", "  line one\nline two\nline three  ")
+    assert tl.items[0].description == "line one\nline two\nline three"
+
+
+def test_edit_empty_text_still_raises_value_error():
+    tl = TodoList(name="test")
+    tl.add_item("task")
+    tl.edit(0, "task", "existing")
+    with pytest.raises(ValueError):
+        tl.edit(0, "   ", "new desc")
+    with pytest.raises(ValueError):
+        tl.edit(0, "", "new desc")
+    assert tl.items[0].text == "task"
+    assert tl.items[0].description == "existing"
+
+
+def test_edit_two_argument_call_still_works():
+    tl = TodoList(name="test")
+    tl.add_item("task")
+    item = tl.edit(0, "updated")
+    assert item is tl.items[0]
+    assert item.text == "updated"
+    assert item.description == ''

@@ -107,8 +107,8 @@ def test_toggle_groups_legacy_items_without_load_time_writes(
 
     assert (selected.text, selected.done) == ("selected", True)
     save.assert_called_once_with("work", [
-        ("oldest", True), ("newer", True), ("selected", True),
-        ("pending first", False), ("pending second", False),
+        ("oldest", True, ""), ("newer", True, ""), ("selected", True, ""),
+        ("pending first", False, ""), ("pending second", False, ""),
     ])
     assert path.read_text(encoding="utf-8") == (
         "# work\n- [x] oldest\n- [x] newer\n- [x] selected\n"
@@ -142,7 +142,7 @@ def test_toggle_returns_exact_duplicate_object_after_reordering(
 
 @pytest.mark.parametrize("index", [2, -3, 1.5, "1", None])
 def test_toggle_invalid_index_does_not_save(controller, tmp_path, monkeypatch, index):
-    controller.store.save("work", [("pending", False), ("completed", True)])
+    controller.store.save("work", [("pending", False, ""), ("completed", True, "")])
     path = _file(tmp_path, "work")
     original = path.read_bytes()
     save = Mock(wraps=controller.store.save)
@@ -216,6 +216,103 @@ def test_edit_item_unchanged_text_is_harmless_noop(controller, tmp_path, monkeyp
     edited = controller.edit_item("work", 0, new_text)
 
     assert (edited.text, edited.done) == ("task one", False)
+    save.assert_not_called()
+    assert path.read_bytes() == original
+
+
+def test_open_list_restores_persisted_descriptions(controller, tmp_path):
+    controller.create_list("work")
+    path = _file(tmp_path, "work")
+    path.write_text(
+        "# work\n- [ ] task one\n  details here\n"
+        "- [x] task two\n  first line\n  second line\n",
+        encoding="utf-8",
+    )
+
+    loaded = controller.open_list("work")
+
+    assert [(item.text, item.done, item.description) for item in loaded.items] == [
+        ("task one", False, "details here"),
+        ("task two", True, "first line\nsecond line"),
+    ]
+
+
+def test_add_toggle_remove_preserve_existing_descriptions(controller, tmp_path):
+    path = _file(tmp_path, "work")
+    path.write_text(
+        "# work\n- [ ] task one\n  details one\n- [ ] task two\n  details two\n",
+        encoding="utf-8",
+    )
+
+    controller.add_item("work", "task three")
+    content = path.read_text(encoding="utf-8")
+    assert "details one" in content
+    assert "details two" in content
+
+    controller.toggle_item("work", 1)
+    content = path.read_text(encoding="utf-8")
+    assert "- [x] task two" in content
+    assert "details one" in content
+    assert "details two" in content
+
+    controller.remove_item("work", 1)
+    content = path.read_text(encoding="utf-8")
+    assert "task one" not in content
+    assert "details one" not in content
+    assert "task two" in content
+    assert "details two" in content
+    assert "task three" in content
+
+
+def test_edit_item_with_description_persists(controller, tmp_path):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+
+    edited = controller.edit_item("work", 0, "task one", "  some details  ")
+
+    assert (edited.text, edited.description) == ("task one", "some details")
+    content = _file(tmp_path, "work").read_text(encoding="utf-8")
+    assert content == "# work\n- [ ] task one\n  some details\n"
+    reloaded = controller.open_list("work")
+    assert reloaded.items[0].description == "some details"
+
+
+def test_edit_item_same_text_changed_description_persists(
+    controller, tmp_path, monkeypatch
+):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+    controller.edit_item("work", 0, "task one", "first version")
+    path = _file(tmp_path, "work")
+    original = path.read_bytes()
+    save = Mock(wraps=controller.store.save)
+    monkeypatch.setattr(controller.store, "save", save)
+
+    edited = controller.edit_item("work", 0, "task one", "second version")
+
+    assert (edited.text, edited.description) == ("task one", "second version")
+    save.assert_called_once_with("work", [("task one", False, "second version")])
+    assert path.read_bytes() != original
+    content = path.read_text(encoding="utf-8")
+    assert "second version" in content
+    assert "first version" not in content
+
+
+@pytest.mark.parametrize("new_desc", ["details", "  details  "])
+def test_edit_item_same_text_and_description_is_noop(
+    controller, tmp_path, monkeypatch, new_desc
+):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+    controller.edit_item("work", 0, "task one", "details")
+    path = _file(tmp_path, "work")
+    original = path.read_bytes()
+    save = Mock(wraps=controller.store.save)
+    monkeypatch.setattr(controller.store, "save", save)
+
+    edited = controller.edit_item("work", 0, "  task one  ", new_desc)
+
+    assert (edited.text, edited.description) == ("task one", "details")
     save.assert_not_called()
     assert path.read_bytes() == original
 

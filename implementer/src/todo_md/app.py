@@ -169,8 +169,10 @@ class TodoController:
     def open_list(self, name: str) -> TodoList:
         """Load a list into a TodoList of TodoItem objects."""
         todo_list = TodoList(name=name)
-        for text, done in self.store.load(name):
-            todo_list.items.append(TodoItem(text=text, done=done))
+        for text, done, description in self.store.load(name):
+            todo_list.items.append(
+                TodoItem(text=text, done=done, description=description)
+            )
         return todo_list
 
     def create_list(self, name: str) -> None:
@@ -188,7 +190,9 @@ class TodoController:
     def _load_and_save(self, name: str, mutate) -> TodoList:
         todo_list = self.open_list(name)
         mutate(todo_list)
-        self.store.save(name, [(item.text, item.done) for item in todo_list.items])
+        self.store.save(
+            name, [(item.text, item.done, item.description) for item in todo_list.items]
+        )
         return todo_list
 
     def add_item(self, name: str, text: str) -> TodoItem:
@@ -214,24 +218,30 @@ class TodoController:
         self._load_and_save(name, _mutate)
         return toggled
 
-    def edit_item(self, name: str, index: int, text: str) -> TodoItem:
-        """Replace the text of the item at ``index`` and persist the change.
+    def edit_item(
+        self, name: str, index: int, text: str, description: str = ''
+    ) -> TodoItem:
+        """Replace the text (and optionally the description) at ``index``.
 
         Empty or whitespace-only text is rejected before anything is
-        loaded or persisted. Saving unchanged text (ignoring surrounding
-        whitespace) is a no-op: nothing is written.
+        loaded or persisted. Saving unchanged text *and* unchanged
+        description (ignoring surrounding whitespace) is a no-op: nothing
+        is written; a description-only change is still persisted.
         """
         stripped = (text or "").strip()
         if not stripped:
             raise ValueError("todo item text must not be empty")
+        stripped_desc = (description or "").strip()
 
         todo_list = self.open_list(name)
         item = todo_list.items[index]
-        if item.text == stripped:
+        if item.text == stripped and item.description == stripped_desc:
             return item
 
-        todo_list.edit(index, stripped)
-        self.store.save(name, [(i.text, i.done) for i in todo_list.items])
+        todo_list.edit(index, stripped, stripped_desc)
+        self.store.save(
+            name, [(i.text, i.done, i.description) for i in todo_list.items]
+        )
         return todo_list.items[index]
 
     def remove_item(self, name: str, index: int) -> TodoItem:
@@ -286,6 +296,7 @@ class TodoApp:
         self._edit_window = None
         self._edit_index: int | None = None
         self._edit_entry = None
+        self._edit_desc_text = None
         self._edit_save_btn = None
         self._edit_cancel_btn = None
         self._item_rows: list[tuple] = []
@@ -1097,11 +1108,12 @@ class TodoApp:
         self._on_edit_item(index)
 
     def _open_edit_dialog(self, index: int) -> None:
-        """Open a theme-aware modal dialog to edit the item's text.
+        """Open a theme-aware modal dialog to edit the item's title and description.
 
         Window styling follows the other dialogs (Toplevel, theme bg,
-        transient). The entry starts pre-populated with the item's current
-        text. ``save`` calls ``controller.edit_item`` for this item, then
+        transient). The title entry and the multi-line description box start
+        pre-populated with the item's current values. ``save`` calls
+        ``controller.edit_item`` with both, then
         closes the dialog and refreshes the list; empty/whitespace-only
         input raises ValueError in the controller and persists nothing, but
         the dialog still closes. ``cancel`` closes the dialog with no
@@ -1116,13 +1128,28 @@ class TodoApp:
         win.title("Edit item")
         win.transient(self.root)
 
+        item = self.controller.open_list(self.current_list).items[index]
         row = ttk.Frame(win, padding=10)
         row.pack(fill=tk.X)
         entry = ttk.Entry(row)
         entry.pack(fill=tk.X)
-        entry.insert(
-            0, self.controller.open_list(self.current_list).items[index].text
+        entry.insert(0, item.text)
+
+        # Multi-line description box below the title. Plain tk.Text is not
+        # ttk-styled, so apply the entry palette colors explicitly.
+        desc_kwargs = {}
+        if self._palette is not None:
+            desc_kwargs = {
+                "bg": self._palette["entry_bg"],
+                "fg": self._palette["fg"],
+                "insertbackground": self._palette["fg"],
+                "highlightbackground": self._palette["btn_bg"],
+            }
+        desc_text = tk.Text(
+            row, height=5, width=40, wrap=tk.WORD, undo=True, **desc_kwargs
         )
+        desc_text.pack(fill=tk.X, pady=(8, 0))
+        desc_text.insert("1.0", item.description)
 
         bottom = ttk.Frame(win, padding=(10, 8))
         bottom.pack(side=tk.BOTTOM)
@@ -1139,6 +1166,7 @@ class TodoApp:
         self._edit_window = win
         self._edit_index = index
         self._edit_entry = entry
+        self._edit_desc_text = desc_text
         self._edit_save_btn = save_btn
         self._edit_cancel_btn = cancel_btn
 
@@ -1146,12 +1174,17 @@ class TodoApp:
         win.update()
 
     def _on_edit_save(self) -> None:
-        """Persist the entry text via controller.edit_item, then close."""
+        """Persist title and description via controller.edit_item, then close."""
         if self._edit_window is None or self.current_list is None:
             return
+        # tk.Text always appends a trailing newline; the controller strips.
+        description = self._edit_desc_text.get("1.0", "end-1c")
         try:
             self.controller.edit_item(
-                self.current_list, self._edit_index, self._edit_entry.get()
+                self.current_list,
+                self._edit_index,
+                self._edit_entry.get(),
+                description,
             )
         except ValueError:
             pass  # empty/whitespace-only text: nothing is persisted
@@ -1163,6 +1196,7 @@ class TodoApp:
         self._edit_window = None
         self._edit_index = None
         self._edit_entry = None
+        self._edit_desc_text = None
         self._edit_save_btn = None
         self._edit_cancel_btn = None
         if win is not None and win.winfo_exists():

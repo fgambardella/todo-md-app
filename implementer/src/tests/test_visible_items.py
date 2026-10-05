@@ -146,7 +146,7 @@ def test_storage_unaffected_by_filter(tmp_path, limit, expected):
     store = MarkdownListStore(tmp_path / "data")
     controller = TodoController(store)
     # A legacy file may interleave completed and incomplete rows.
-    store.save("work", [("c1", True), ("todo1", False), ("c2", True), ("c3", True)])
+    store.save("work", [("c1", True, ""), ("todo1", False, ""), ("c2", True, ""), ("c3", True, "")])
 
     before = (tmp_path / "data" / "work.md").read_bytes()
 
