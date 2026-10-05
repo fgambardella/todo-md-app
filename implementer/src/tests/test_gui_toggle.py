@@ -47,6 +47,11 @@ def _rows(app):
     return [(label.cget("text"), bool(var.get())) for var, _, label, _del, _edit in app._item_rows]
 
 
+def _stored(rows, description=""):
+    """Lift displayed ``(text, done)`` rows to the stored 3-tuple contract."""
+    return [(text, done, description) for text, done in rows]
+
+
 def _parse_rgb(value: str) -> tuple:
     """Parse a tkinter color string into an (r, g, b) int tuple."""
     value = value.strip().lstrip("#")
@@ -60,7 +65,7 @@ def _overstrike(label) -> bool:
 
 
 def test_toggle_updates_gui(make_app):
-    app = make_app([("first item", False), ("second item", False)])
+    app = make_app([("first item", False, ""), ("second item", False, "")])
     assert len(app._item_rows) == 2
     var, cb, label, _del, _edit = app._item_rows[0]
 
@@ -119,7 +124,7 @@ def test_legacy_rows_group_without_writes_on_load(make_app, tmp_path, limit, exp
 
 
 def test_completion_order_eviction_undo_recompletion_and_reload(make_app, tmp_path):
-    app = make_app([(text, False) for text in ("first", "second", "third", "fourth", "fifth")])
+    app = make_app([(text, False, "") for text in ("first", "second", "third", "fourth", "fifth")])
 
     # Complete out of source order; each callback must use its stored index.
     app._item_rows[2][1].invoke()
@@ -136,7 +141,8 @@ def test_completion_order_eviction_undo_recompletion_and_reload(make_app, tmp_pa
     app.root.update()
     assert _rows(app) == [("first", True), ("fourth", True), ("second", False), ("fifth", False)]
     assert app.controller.store.load("work") == [
-        ("third", True), ("first", True), ("fourth", True), ("second", False), ("fifth", False)
+        ("third", True, ""), ("first", True, ""), ("fourth", True, ""),
+        ("second", False, ""), ("fifth", False, ""),
     ]
 
     # Undo restores the previously hidden completion and leads the incomplete group.
@@ -145,14 +151,14 @@ def test_completion_order_eviction_undo_recompletion_and_reload(make_app, tmp_pa
     assert _rows(app) == [
         ("third", True), ("fourth", True), ("first", False), ("second", False), ("fifth", False)
     ]
-    assert app.controller.store.load("work") == _rows(app)
+    assert app.controller.store.load("work") == _stored(_rows(app))
 
     # Re-completion makes first newest, evicting third, never an incomplete row.
     app._item_rows[2][1].invoke()
     app.root.update()
     expected = [("fourth", True), ("first", True), ("second", False), ("fifth", False)]
     assert _rows(app) == expected
-    persisted = [("third", True)] + expected
+    persisted = _stored([("third", True)] + expected)
     assert app.controller.store.load("work") == persisted
     before = (tmp_path / "data" / "work.md").read_bytes()
     reloaded = make_app()
@@ -169,22 +175,22 @@ def test_callbacks_use_identity_for_reordered_equal_duplicates(
 ):
     # Equal dataclass values must not alias a hidden completion or an earlier todo.
     monkeypatch.setattr("todo_md.models.time.time", lambda: 1)
-    items = [("same", True), ("same", False), ("between", False),
-             ("same", True), ("same", False), ("tail", False)]
+    items = [("same", True, ""), ("same", False, ""), ("between", False, ""),
+             ("same", True, ""), ("same", False, ""), ("tail", False, "")]
     app = make_app(items, completed_visible=1)
     loaded = app.controller.open_list("work").items
     assert loaded[0] == loaded[3] and loaded[0] is not loaded[3]
     assert loaded[1] == loaded[4] and loaded[1] is not loaded[4]
-    assert _rows(app) == [items[i] for i in (3, 1, 2, 4, 5)]
+    assert _rows(app) == [items[i][:2] for i in (3, 1, 2, 4, 5)]
     expected = list(items)
-    text, done = expected.pop(stored_index)
+    text, done, description = expected.pop(stored_index)
 
     if action == "toggle":
         with patch.object(app.controller, "toggle_item", wraps=app.controller.toggle_item) as toggle:
             app._item_rows[display_index][1].invoke()
             app.root.update()
         toggle.assert_called_once_with("work", stored_index)
-        expected = ([item for item in expected if item[1]] + [(text, not done)]
+        expected = ([item for item in expected if item[1]] + [(text, not done, description)]
                     + [item for item in expected if not item[1]])
     else:
         with patch("tkinter.messagebox.askyesno", return_value=True) as ask:
@@ -195,5 +201,5 @@ def test_callbacks_use_identity_for_reordered_equal_duplicates(
         remove.assert_called_once_with("work", stored_index)
 
     assert app.controller.store.load("work") == expected
-    assert _rows(app) == ([item for item in expected if item[1]][-1:]
-                          + [item for item in expected if not item[1]])
+    assert _rows(app) == ([item[:2] for item in expected if item[1]][-1:]
+                          + [item[:2] for item in expected if not item[1]])

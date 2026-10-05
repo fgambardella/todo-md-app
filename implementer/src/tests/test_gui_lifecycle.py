@@ -139,7 +139,7 @@ def test_settings_fixture_cleans_roots_after_failure(
             assert tk._default_root is None
             assert dialog_guard.attempts == []
             app = make_app()
-            app.controller.store.save("fresh", [("working image", False)])
+            app.controller.store.save("fresh", [("working image", False, "")])
             app.refresh_lists(select_first=True)
             app.root.update()
             assert app._trash_image.tk is app.root.tk
