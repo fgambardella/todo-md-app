@@ -31,11 +31,11 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - **Task 46 (M)** — Description field for todo items.
 - Branch: `implementer/46-item-description` (base and integration: `main`).
 - Scope: `TodoItem.description` (str, default `""`); `TodoList.edit` sets title + description; storage round-trips description as two-space-indented continuation lines under each checkbox line (legacy files parse as empty description; empty description writes no extra lines); controller persists description through `edit_item`; edit modal gains a pre-populated description text box (Save persists both fields; Cancel or empty title stays a no-op).
-- Micro-tasks (sequential, same branch, prior commit as start state): 46.1 domain (done, `080f035`); 46.2a storage (done, `427a3b5`); 46.2b1 controller code (done, `5207baa`); 46.2b2 controller tests (done, `f594d35`); 46.2b3 remaining test files (test_gui_lifecycle, test_gui_settings, test_gui_toggle, test_visible_items); 46.3 GUI modal description box (`tests/test_gui_edit.py`, `tests/test_gui_double_click.py`).
+- Micro-tasks (sequential, same branch, prior commit as start state): 46.1 domain (done, `080f035`); 46.2a storage (done, `427a3b5`); 46.2b1 controller code (done, `5207baa`); 46.2b2 controller tests (done, `f594d35`); 46.2b3 remaining test files (done, `a8a133b`); 46.3 GUI modal description box (`tests/test_gui_edit.py`, `tests/test_gui_double_click.py`).
 - Acceptance: title remains required non-empty after strip; description stored stripped, `""` when blank, internal newlines preserved; legacy `.md` without descriptions loads unchanged; no spurious lines written for empty descriptions; every mutation persists immediately; full suite green.
 - Required tests: full suite plus targeted `tests/test_models.py`, `tests/test_storage.py`, `tests/test_controller.py`, `tests/test_gui_edit.py`, `tests/test_gui_double_click.py` (subset per micro-task).
 - Test commands from `implementer/`: full `(cd src && .venv/bin/python -m pytest tests -v)`; targeted `(cd src && .venv/bin/python -m pytest tests/<files>.py -v)`.
-- Checkpoint: 46.1 `080f035`; 46.2a `427a3b5`; 46.2b1 `5207baa`; 46.2b2 `f594d35` (verified). 19 failures remain across 4 test files. 46.2b3 attempts 1–2 and 46.2b3a attempts 1–2 all timed out at 1,200s with 0-byte logs and no commit (tree verified clean each time). User decision: remaining test migration (all 4 files, 19 failures) is handed off in one shot to a faster, more capable model via the external prompt in `/tmp/implementer-prompt-46.2b3-external.txt`; Architect will independently verify the resulting commit before 46.3.
+- Checkpoint: 46.1 `080f035`; 46.2a `427a3b5`; 46.2b1 `5207baa`; 46.2b2 `f594d35`; 46.2b3 `a8a133b` — executed externally (4 in-harness `pi` attempts all hit the 1,200s timeout with 0-byte logs, no work lost); independently verified: only the 4 test files + VERSION bump changed, no weakened/skipped assertions, full suite 335 passed / 2 skipped. 46.3 is the last micro-task; prompt prepared at `/tmp/implementer-prompt-46.3-external.txt` (external hand-off mode, same as 46.2b3, due to `pi` slowness).
 - Files in /tmp from previous executions:
   1) implementer-46.2.log
   2) implementer-prompt-46.2.txt
@@ -54,7 +54,8 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
   15) implementer-46.2b3a.log
   16) implementer-prompt-46.2b3a.txt
   17) implementer-46.2b3a-attempt2.log
-  18) implementer-prompt-46.2b3-external.txt (keep until verification done)
+  18) implementer-prompt-46.2b3-external.txt
+  19) implementer-prompt-46.3-external.txt (keep until verification done)
   Check the content and delete them after a successful completion.
 
 ## Queue
