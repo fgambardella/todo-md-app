@@ -35,9 +35,10 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
 - Acceptance: title remains required non-empty after strip; description stored stripped, `""` when blank, internal newlines preserved; legacy `.md` without descriptions loads unchanged; no spurious lines written for empty descriptions; every mutation persists immediately; full suite green.
 - Required tests: full suite plus targeted `tests/test_models.py`, `tests/test_storage.py`, `tests/test_controller.py`, `tests/test_gui_edit.py`, `tests/test_gui_double_click.py` (subset per micro-task).
 - Test commands from `implementer/`: full `(cd src && .venv/bin/python -m pytest tests -v)`; targeted `(cd src && .venv/bin/python -m pytest tests/<files>.py -v)`.
-- Checkpoint: 46.1 `080f035`; 46.2a `427a3b5`; 46.2b1 `5207baa`; 46.2b2 verified at `f594d35` (46.2b2 attempt 1 failed preflight on a stale staged VERSION index artifact — architect reconciled index-only, no work lost; attempt 2 child committed then the pipe died at 1,200s with 0-byte log — commit found on branch and independently verified: `test_controller.py` green, 53 passed). 19 failures remain, all 2-tuple fixtures in other test files (re-scoped to 46.2b3, which owns the full-suite-green gate). 46.2b3 dispatching now.
-- Prompt (current micro-task 46.2b3, remaining test migration; NO production changes):
-  > Task 46, micro-task 46.2b3 (remaining test files only): migrate all leftover 2-tuple fixtures/assertions to the 3-tuple `(text, done, description)` contract so the full suite is green. Production code is already on the 3-tuple contract (commits `427a3b5`, `5207baa`); `tests/test_controller.py` and `tests/test_storage.py` are already migrated — do not touch them. You are on branch `implementer/46-item-description` (base and integration branch: `main`), starting from the current branch tip with a clean tree. Verify with `git branch --show-current` and `git status --short` before editing. First tool call: run `../architect/tools/implementer-run.sh` without arguments; use that wrapper for every subsequent Bash command and follow the Mandatory Execution Clock phase rules; the harness is read-only, never modify it. Change only these files: `implementer/src/tests/test_gui_lifecycle.py` (including the embedded test-code string literals that spawn the isolated `test_isolated.py` subprocess — the `test_injected_failure` and `test_clean_app_after_failure` failures come from those literals), `implementer/src/tests/test_gui_settings.py`, `implementer/src/tests/test_gui_toggle.py`, `implementer/src/tests/test_visible_items.py`. Fix every 2-tuple produced or asserted to the 3-tuple contract (default description `''`). Do NOT weaken, skip, or xfail existing assertions; do NOT touch production code or any other file. Never modify anything under `../architect/` or the repo root. No branch creation/switching/merging/pushing; never commit to `main`; no broad staging or destructive git operations. A pre-commit hook auto-bumps `implementer/src/todo_md/VERSION`; when committing, stage only the changed test files by explicit path. Completion gate from `implementer/`: `(cd src && .venv/bin/python -m pytest tests -v)` fully green. Commit with message `Migrate remaining GUI tests to 3-tuple contract (46.2b3)`; the handoff must state RESULT: SUCCESS/FAILURE, the branch name, and the commit hash (COMMIT: NONE only if nothing changed).
+- Checkpoint: 46.1 `080f035`; 46.2a `427a3b5`; 46.2b1 `5207baa`; 46.2b2 `f594d35` (verified; 46.2b2 attempt 1 preflight failed on stale staged VERSION index — architect reconciled index-only; attempt 2 child committed, pipe died at 1,200s — commit found and verified). 19 failures remain in 4 test files, split by failure type into micro-sub-tasks 46.2b3a–d. 46.2b3 attempt 1 stalled prefill, no work lost; re-scoped 46.2b3a dispatching now.
+- Micro-sub-task split (46.2b3, all same branch, sequential, each one file, NO production changes): a = `tests/test_gui_settings.py`; b = `tests/test_gui_toggle.py`; c = `tests/test_visible_items.py`; d = `tests/test_gui_lifecycle.py` (incl. embedded `test_isolated.py` subprocess string literals). Full-suite-green gate rides on the last sub-task (d).
+- Prompt template (per sub-task, replace `<FILE>` and the completion gate):
+  > Task 46, micro-sub-task 46.2b3<LETTER> (single test file only): migrate every 2-tuple fixture/assertion in `implementer/src/tests/<FILE>` to the 3-tuple `(text, done, description)` contract (default description `''`). Production code is already on the 3-tuple contract; only this one test file may change. You are on branch `implementer/46-item-description` (base and integration branch: `main`), starting from the current branch tip with a clean tree. Verify with `git branch --show-current` and `git status --short` before editing. First tool call: run `../architect/tools/implementer-run.sh` without arguments; use that wrapper for every subsequent Bash command and follow the Mandatory Execution Clock phase rules; the harness is read-only, never modify it. Do NOT weaken, skip, or xfail existing assertions; do NOT touch production code or any other file. Never modify anything under `../architect/` or the repo root. No branch creation/switching/merging/pushing; never commit to `main`; no broad staging or destructive git operations. A pre-commit hook auto-bumps `implementer/src/todo_md/VERSION`; when committing, stage only the changed test file by explicit path. Commit early as soon as the file's targeted tests are green (message `Migrate <FILE> to 3-tuple contract (46.2b3<LETTER>)`). Completion gate from `implementer/`: `(cd src && .venv/bin/python -m pytest tests/<FILE> -v)` fully green. Handoff must state RESULT: SUCCESS/FAILURE, the branch name, and the commit hash (COMMIT: NONE only if nothing changed).
 - Files in /tmp from previous executions:
   1) implementer-46.2.log
   2) implementer-prompt-46.2.txt
@@ -51,15 +52,17 @@ Build a macOS desktop TODO app in Python with a stdlib-only runtime. Persist eac
   10) implementer-prompt-46.2b2.txt
   11) implementer-46.2b2.log
   12) implementer-prompt-46.2b3.txt
+  13) implementer-46.2b3-v2.log
+  14) implementer-prompt-46.2b3-v2.txt
   Check the content and delete them after a successful completion.
-  
+
 ## Queue
 
 None.
 
 ## Active Blockers
 
-- `pi` child launches repeatedly hit memory limits (macOS free-page floor / GPU OOM): some stall at prefill with 0 bytes output until the hard timeout, one died after editing but before committing (recovered via verify-and-commit follow-up). Mitigate with narrower micro-tasks, early commits, fresh retries; verify handoff hashes against `git rev-parse`.
+None.
 
 ## Recently Completed
 
