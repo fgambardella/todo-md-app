@@ -2,14 +2,17 @@
 
 A small **desktop TODO application for macOS**, written in Python (stdlib only, no runtime dependencies). Its defining trait: **every list is persisted as its own plain Markdown file** using GitHub-flavored checkbox syntax, so your data is human-readable, diffable, and portable — no database.
 
-Lists are stored by default in `~/.todo-md-app/lists/`, one file per list, e.g. `Shopping.md`:
+Lists are stored by default in `~/.todo-md-app/lists/`, one file per list, e.g. `Shopping.md` (an item's optional multi-line description is stored as two-space-indented lines under its checkbox line):
 
 ```markdown
 # Shopping
 - [x] Buy milk
 - [ ] Buy bread
+  2% if available
 - [ ] Coffee beans
 ```
+
+App settings (theme, completed-item visibility, lists directory) persist as `settings.json` in a dedicated config directory (e.g. `~/.todo-md-app/config`), separate from the Markdown lists.
 
 ## Architecture
 
@@ -18,15 +21,19 @@ The code lives in `src/todo_md/` and is layered so that all business logic is te
 ```
 src/
 ├── todo_md/
-│   ├── __init__.py     # package exports (MarkdownListStore)
+│   ├── __init__.py     # package exports (domain, storage, settings, version)
 │   ├── models.py       # Domain layer: TodoItem, TodoList dataclasses
 │   ├── storage.py      # Persistence layer: MarkdownListStore
 │   ├── settings.py     # Headless settings (Settings, load/save, theme resolution)
 │   ├── version.py      # Headless version loader (get_version)
+│   ├── VERSION         # App version (X.Y.Z), auto-bumped by the git hook
+│   ├── assets/         # Dock/Finder icon source (dock_icon.png)
 │   ├── app.py          # TodoController (UI-agnostic view-model) + TodoApp (tkinter GUI)
 │   └── __main__.py     # Entry point: python -m todo_md
+├── requirements-dev.txt # Dev-only pins (PyInstaller)
 ├── scripts/
 │   ├── build_app.sh    # PyInstaller build → self-contained dist/todo-md.app (Apple Silicon only)
+│   ├── release_package.sh # Builds the bundle + versioned release zip
 │   └── bump_version.sh # version bump + pre-commit hook installer
 └── tests/              # pytest suite (headless core + GUI tests on a real display)
 ```
@@ -35,7 +42,7 @@ src/
 - **Persistence — `storage.py`**: `MarkdownListStore` reads/writes each list as `<Name>.md` (`- [ ]` / `- [x]` checkbox lines under a `# Name` header; an item description is stored as two-space-indented continuation lines directly under its checkbox line — legacy files parse as empty description, empty descriptions write no extra lines). Writes are **atomic** (temp file + `os.replace`, no partial content on failure); list names are sanitized to filesystem-safe characters.
 - **View-model — `app.py` (`TodoController`)**: pure logic bridging domain and storage: create/delete lists, open a list, add/toggle/edit/remove items — every mutation is persisted immediately. No tkinter imports, so it is fully unit-testable without a display.
 - **Versioning — `version.py` + `VERSION`**: headless `get_version()` reads `todo_md/VERSION` (falls back to `0.0.0`); the GUI displays it as a small low-contrast badge in the bottom-right corner. A git pre-commit hook (installed via `implementer/src/scripts/bump_version.sh --install-hook`) bumps the patch version on every commit.
-- **Presentation — `app.py` (`TodoApp`)**: a native-feeling **Tkinter** GUI (list sidebar with create/delete — button or Enter in the new-list entry, checkbutton-backed item rows with a trash-bin delete icon and an edit icon opening a pre-populated modal dialog (title entry + multi-line description box, both persisted on Save) — double-clicking an unfinished item's text opens the same dialog —, an entry + button for adding items, refresh after each mutation). Modal dialogs (settings window, item-edit dialog) open vertically and horizontally centered on the main window. Deleting a list or an item first asks for confirmation (Yes/No popup). Tkinter is imported lazily so the package stays importable on display-less machines/CI.
+- **Presentation — `app.py` (`TodoApp`)**: a native-feeling **Tkinter** GUI (list sidebar with create/delete — button or Enter in the new-list entry, checkbutton-backed item rows with a trash-bin delete icon and an edit icon opening a pre-populated modal dialog (title entry + multi-line description box, both persisted on Save) — double-clicking an unfinished item's text opens the same dialog —, an entry + button for adding items, refresh after each mutation). Completed items retain completion order above unfinished items and only the newest configured count is shown (hidden items are never deleted from disk). A settings window changes theme, completed-item visibility and the lists directory (with optional list movement) live, persisting the full payload on Save. Modal dialogs (settings window, item-edit dialog) open vertically and horizontally centered on the main window. Deleting a list or an item first asks for confirmation (Yes/No popup). Tkinter is imported lazily so the package stays importable on display-less machines/CI.
 - **Entry point — `__main__.py`**: launches controller + GUI via `run()`.
 - **Build tooling — `scripts/build_app.sh`**: freezes the app into a self-contained `todo-md.app` bundle for Apple Silicon macOS (see “Building a self-contained app bundle” below).
 
