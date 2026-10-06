@@ -618,6 +618,42 @@ class TodoApp:
         # Re-resolve the luminance-adaptive label colors.
         self._refresh_items()
 
+    def _center_window_on_parent(self, win) -> None:
+        """Center ``win`` over the main window's current on-screen rectangle.
+
+        Call after the dialog's size geometry has been set (or after its
+        first ``update``). The position is recomputed on every open from
+        the live parent geometry, so a moved main window re-centers the
+        dialog on the next open. Placement is self-correcting: after the
+        initial ``geometry('+x+y')`` the actual on-screen rectangles are
+        re-measured and one corrective nudge removes any window-manager
+        frame offset (e.g. the ~title-bar-height shift on macOS).
+        """
+        win.update_idletasks()
+        width, height = win.winfo_width(), win.winfo_height()
+        if width < 2 or height < 2:  # not measured yet: use requested size
+            width, height = win.winfo_reqwidth(), win.winfo_reqheight()
+        px, py = self.root.winfo_rootx(), self.root.winfo_rooty()
+        pw, ph = self.root.winfo_width(), self.root.winfo_height()
+        x = px + (pw - width) // 2
+        y = py + (ph - height) // 2
+        win.geometry(f"+{x}+{y}")
+        # Some window managers (macOS in particular) honor
+        # ``geometry('+x+y')`` against the window frame, not the client area, so
+        # the measured client origin ends up offset from the request (roughly a
+        # title-bar height on macOS). Re-measure the actual on-screen
+        # rectangles and subtract the residual centering error from the
+        # requested origin, instead of hardcoding frame sizes.
+        win.update_idletasks()
+        ox, oy = win.winfo_rootx(), win.winfo_rooty()
+        ow, oh = win.winfo_width(), win.winfo_height()
+        if ow < 2 or oh < 2:
+            ow, oh = width, height
+        ex = ox + ow // 2 - (px + pw // 2)
+        ey = oy + oh // 2 - (py + ph // 2)
+        if ex or ey:
+            win.geometry(f"+{x - ex}+{y - ey}")
+
     # -- settings window --------------------------------------------------
 
     def _open_settings(self) -> None:
@@ -717,6 +753,7 @@ class TodoApp:
         win.minsize(width, height)
         win.geometry(f"{max(420, width)}x{max(280, height)}")
         win.update()
+        self._center_window_on_parent(win)
 
     def _settings_browse(self, var) -> None:
         """Pick a directory via filedialog and store it in ``var``."""
@@ -1172,6 +1209,7 @@ class TodoApp:
 
         win.grab_set()
         win.update()
+        self._center_window_on_parent(win)
 
     def _on_edit_save(self) -> None:
         """Persist title and description via controller.edit_item, then close."""
