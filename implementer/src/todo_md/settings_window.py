@@ -127,3 +127,73 @@ class SettingsWindow:
         """Destroy the window if it still exists."""
         if self.window.winfo_exists():
             self.window.destroy()
+
+
+def decide_lists_dir(app, messagebox, entry_text: str) -> tuple[bool, str | None]:
+    """Resolve the entry into ``(proceed, chosen_directory)``.
+
+    ``proceed`` is False when an error was already reported (nothing
+    persisted). Successful paths are absolute, including the default.
+    Raises OSError for directory inspection/equivalence failures.
+    """
+    target = app_module._normalize_dir(entry_text.strip() or app_module.DEFAULT_DATA_DIR)
+    old_dir = str(app.controller.store.data_dir)
+
+    if app_module._same_dir(old_dir, target):
+        return True, target
+
+    move = True
+    if app_module._has_markdown(old_dir):
+        prompt = (
+            "You are about to change the directory where your lists are stored "
+            f"from '{old_dir}' to '{target}' but there are already lists in it."
+            " Do you want to copy them in the new path?"
+        )
+        answer = messagebox.askyesnocancel("Confirm directory change", prompt)
+        if answer is None:  # Cancel: keep active directory, abandon target.
+            return True, app_module._normalize_dir(old_dir)
+        move = answer
+
+    if not app_module._valid_lists_dir_path(target):
+        messagebox.showerror(
+            "Settings",
+            "The lists folder is not an existing directory and cannot\n"
+            f"be created:\n{target}",
+        )
+        return False, None
+    try:
+        app.controller.change_lists_dir(target, move=move)
+    except OSError as e:
+        refresh_error = ""
+        try:
+            sync_lists_directory(app)
+        except (OSError, UnicodeError) as refresh_exc:
+            refresh_error = f"\nCould not refresh the active lists folder: {refresh_exc}"
+        messagebox.showerror(
+            "Directory change failed",
+            f"Could not switch lists folder from '{old_dir}' to '{target}': "
+            f"{e}\n\nSome files may already be at the destination. "
+            "Completed moves have not been undone. "
+            f"The active lists folder is '{app.controller.store.data_dir}'. "
+            f"The directory preference is not saved for restart.{refresh_error}",
+        )
+        return False, None
+    return True, target
+
+
+def sync_lists_directory(app) -> None:
+    """Follow the bound store without applying pending theme/filter edits."""
+    app.data_dir = str(app.controller.store.data_dir)
+    # Keep an accurate runtime path even if default equivalence cannot be read.
+    app.settings.lists_dir = app_module._normalize_dir(app.data_dir)
+    try:
+        app.settings.lists_dir = lists_dir_setting(app.settings.lists_dir)
+    finally:
+        app.refresh_lists()
+
+
+def lists_dir_setting(path: str) -> str | None:
+    """Persisted form of an effective directory: None for the default."""
+    if app_module._same_dir(path, app_module._normalize_dir(app_module.DEFAULT_DATA_DIR)):
+        return None
+    return path

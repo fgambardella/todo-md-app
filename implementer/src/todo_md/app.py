@@ -739,6 +739,7 @@ class TodoApp:
         the in-memory settings, then re-applies the theme and refreshes rows.
         """
         from tkinter import messagebox  # lazy: keep module importable headless
+        from . import settings_window as sw  # lazy: keep module importable headless
 
         theme = self._settings_theme_var.get()
         try:
@@ -763,13 +764,13 @@ class TodoApp:
         old_dir = str(self.controller.store.data_dir)
         target = self._settings_lists_dir_var.get()
         try:
-            proceed, new_lists_dir = self._decide_lists_dir(
-                messagebox, target
+            proceed, new_lists_dir = sw.decide_lists_dir(
+                self, messagebox, target
             )
             if not proceed:
                 return
-            self._sync_lists_directory()
-            new_lists_dir = self._lists_dir_setting(new_lists_dir)
+            sw.sync_lists_directory(self)
+            new_lists_dir = sw.lists_dir_setting(new_lists_dir)
         except (OSError, UnicodeError) as e:
             messagebox.showerror(
                 "Settings",
@@ -811,74 +812,6 @@ class TodoApp:
         self._refresh_items()
 
         self._close_settings()
-
-    def _decide_lists_dir(self, messagebox, entry_text: str) -> tuple[bool, str | None]:
-        """Resolve the entry into ``(proceed, chosen_directory)``.
-
-        ``proceed`` is False when an error was already reported (nothing
-        persisted). Successful paths are absolute, including the default.
-        Raises OSError for directory inspection/equivalence failures.
-        """
-        target = _normalize_dir(entry_text.strip() or DEFAULT_DATA_DIR)
-        old_dir = str(self.controller.store.data_dir)
-
-        if _same_dir(old_dir, target):
-            return True, target
-
-        move = True
-        if _has_markdown(old_dir):
-            prompt = (
-                "You are about to change the directory where your lists are stored "
-                f"from '{old_dir}' to '{target}' but there are already lists in it."
-                " Do you want to copy them in the new path?"
-            )
-            answer = messagebox.askyesnocancel("Confirm directory change", prompt)
-            if answer is None:  # Cancel: keep active directory, abandon target.
-                return True, _normalize_dir(old_dir)
-            move = answer
-
-        if not _valid_lists_dir_path(target):
-            messagebox.showerror(
-                "Settings",
-                "The lists folder is not an existing directory and cannot\n"
-                f"be created:\n{target}",
-            )
-            return False, None
-        try:
-            self.controller.change_lists_dir(target, move=move)
-        except OSError as e:
-            refresh_error = ""
-            try:
-                self._sync_lists_directory()
-            except (OSError, UnicodeError) as refresh_exc:
-                refresh_error = f"\nCould not refresh the active lists folder: {refresh_exc}"
-            messagebox.showerror(
-                "Directory change failed",
-                f"Could not switch lists folder from '{old_dir}' to '{target}': "
-                f"{e}\n\nSome files may already be at the destination. "
-                "Completed moves have not been undone. "
-                f"The active lists folder is '{self.controller.store.data_dir}'. "
-                f"The directory preference is not saved for restart.{refresh_error}",
-            )
-            return False, None
-        return True, target
-
-    def _sync_lists_directory(self) -> None:
-        """Follow the bound store without applying pending theme/filter edits."""
-        self.data_dir = str(self.controller.store.data_dir)
-        # Keep an accurate runtime path even if default equivalence cannot be read.
-        self.settings.lists_dir = _normalize_dir(self.data_dir)
-        try:
-            self.settings.lists_dir = self._lists_dir_setting(self.settings.lists_dir)
-        finally:
-            self.refresh_lists()
-
-    @staticmethod
-    def _lists_dir_setting(path: str) -> str | None:
-        """Persisted form of an effective directory: None for the default."""
-        if _same_dir(path, _normalize_dir(DEFAULT_DATA_DIR)):
-            return None
-        return path
 
     def _close_settings(self) -> None:
         """Teardown: destroy the window (if alive) and drop the holder."""
