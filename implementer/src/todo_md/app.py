@@ -291,7 +291,8 @@ class TodoApp:
             config_dir if config_dir is not None else DEFAULT_CONFIG_DIR
         )
         self.current_list: str | None = None
-        self.settings_window = None
+        # Settings window state holder (SettingsWindow while open, else None).
+        self._settings = None
         # Edit dialog state (None while no edit modal is open).
         self._edit_window = None
         self._edit_index: int | None = None
@@ -656,112 +657,60 @@ class TodoApp:
 
     # -- settings window --------------------------------------------------
 
+    @property
+    def settings_window(self):
+        """The live Settings Toplevel, or None while the window is closed."""
+        return self._settings.window if self._settings is not None else None
+
+    @property
+    def _settings_lists_dir_var(self):
+        return self._settings.lists_dir_var
+
+    @property
+    def _settings_theme_var(self):
+        return self._settings.theme_var
+
+    @property
+    def _settings_theme_rads(self):
+        return self._settings.theme_rads
+
+    @property
+    def _settings_completed_var(self):
+        return self._settings.completed_var
+
+    @property
+    def _settings_spinbox(self):
+        return self._settings.spinbox
+
+    @property
+    def _settings_save_btn(self):
+        return self._settings.save_btn
+
+    @property
+    def _settings_cancel_btn(self):
+        return self._settings.cancel_btn
+
+    @property
+    def _settings_reset_btn(self):
+        return self._settings.reset_btn
+
     def _open_settings(self) -> None:
         """Open the Toplevel settings window (single instance).
 
-        The window is pre-filled from the in-memory ``self.settings``
-        (effective lists dir = ``settings.lists_dir`` or the app default)
-        and every control is bound to a small state holder on ``self``
-        (StringVar/IntVar) so the Save handler can read the edited
-        values in one place. Save validates and applies (see
-        ``_settings_on_save``); Cancel is a full no-op that only closes
-        the window.
+        All construction lives in :class:`todo_md.settings_window.SettingsWindow`
+        (widgets, vars, handlers, centering); the Save flow stays on
+        :class:`TodoApp` (see ``_settings_on_save``); Cancel and the window
+        close handler both delegate back to ``_close_settings``.
         """
-        import tkinter as tk
-        from tkinter import ttk
-
         if (
-            getattr(self, "settings_window", None) is not None
-            and self.settings_window.winfo_exists()
+            self._settings is not None
+            and self._settings.window.winfo_exists()
         ):
-            self.settings_window.lift()
+            self._settings.window.lift()
             return
+        from .settings_window import SettingsWindow  # lazy: keep headless
 
-        win = tk.Toplevel(self.root)
-        if self._palette is not None:
-            win.configure(bg=self._palette["bg"])
-        win.title("Settings")
-        win.transient(self.root)
-        self.settings_window = win
-
-        # State holders: one var per control group (lists folder, theme,
-        # completed-visible count).
-        self._settings_lists_dir_var = tk.StringVar(
-            value=self.settings.lists_dir or DEFAULT_DATA_DIR
-        )
-        self._settings_theme_var = tk.StringVar(value=self.settings.theme)
-        self._settings_completed_var = tk.IntVar(value=self.settings.completed_visible)
-
-        # (a) lists-folder row: entry + Browse… + Reset to default --------
-        folder_row = ttk.Frame(win, padding=(10, 8))
-        folder_row.pack(fill=tk.X)
-        ttk.Label(folder_row, text="Lists folder:").grid(
-            row=0, column=0, columnspan=3, sticky="w", pady=(0, 2)
-        )
-        ttk.Entry(folder_row, textvariable=self._settings_lists_dir_var).grid(
-            row=1, column=0, columnspan=3, sticky="we", pady=(0, 2)
-        )
-        ttk.Button(
-            folder_row,
-            text="Browse…",
-            command=lambda: self._settings_browse(self._settings_lists_dir_var),
-        ).grid(row=2, column=0, sticky="w", padx=(0, 4))
-        self._settings_reset_btn = ttk.Button(
-            folder_row,
-            text="Reset to default",
-            command=lambda: self._settings_lists_dir_var.set(DEFAULT_DATA_DIR),
-        )
-        self._settings_reset_btn.grid(row=2, column=1, columnspan=2, sticky="w")
-        folder_row.columnconfigure(0, weight=1)
-
-        # (b) theme radiobuttons ------------------------------------------
-        theme_row = ttk.LabelFrame(win, text="Theme", padding=(10, 8))
-        theme_row.pack(fill=tk.X, padx=10)
-        self._settings_theme_rads = []
-        for value, label in (("system", "System default"), ("light", "Light"), ("dark", "Dark")):
-            rad = ttk.Radiobutton(
-                theme_row, text=label, value=value, variable=self._settings_theme_var
-            )
-            rad.pack(anchor="w")
-            self._settings_theme_rads.append(rad)
-
-        # (c) completed-visible spinbox (0 = hide all completed) ----------
-        cv_row = ttk.Frame(win, padding=(10, 8))
-        cv_row.pack(fill=tk.X)
-        ttk.Label(cv_row, text="Completed items visible:").pack(side=tk.LEFT)
-        self._settings_spinbox = ttk.Spinbox(
-            cv_row, from_=0, to=999, width=6, textvariable=self._settings_completed_var
-        )
-        self._settings_spinbox.pack(side=tk.LEFT, padx=(8, 0))
-
-        # (d) Save / Cancel ----------------------------------------------
-        bottom = ttk.Frame(win, padding=(10, 8))
-        bottom.pack(side=tk.BOTTOM)
-        self._settings_save_btn = ttk.Button(
-            bottom, text="Save", command=self._settings_on_save
-        )
-        self._settings_save_btn.pack(side=tk.RIGHT, padx=(6, 0))
-        self._settings_cancel_btn = ttk.Button(
-            bottom, text="Cancel", command=self._close_settings
-        )
-        self._settings_cancel_btn.pack(side=tk.RIGHT)
-
-        win.protocol("WM_DELETE_WINDOW", self._close_settings)
-        # Fit all controls using the current theme's font and widget metrics.
-        win.update_idletasks()
-        width, height = win.winfo_reqwidth(), win.winfo_reqheight()
-        win.minsize(width, height)
-        win.geometry(f"{max(420, width)}x{max(280, height)}")
-        win.update()
-        self._center_window_on_parent(win)
-
-    def _settings_browse(self, var) -> None:
-        """Pick a directory via filedialog and store it in ``var``."""
-        from tkinter import filedialog  # lazy: keep module importable headless
-
-        path = filedialog.askdirectory(parent=self.settings_window, initialdir=var.get())
-        if path:
-            var.set(path)
+        self._settings = SettingsWindow(self)
 
     def _settings_on_save(self) -> None:
         """Validate, apply the directory decision, persist, and live-apply; close.
@@ -932,10 +881,10 @@ class TodoApp:
         return path
 
     def _close_settings(self) -> None:
-        win = getattr(self, "settings_window", None)
-        if win is not None and win.winfo_exists():
-            win.destroy()
-        self.settings_window = None
+        """Teardown: destroy the window (if alive) and drop the holder."""
+        if self._settings is not None:
+            self._settings.close()
+            self._settings = None
 
     # -- list-frame handlers ----------------------------------------------
 
