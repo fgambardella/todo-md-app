@@ -13,33 +13,29 @@ macOS desktop TODO app (Python 3, stdlib only): each list is one Markdown file w
 A working macOS TODO application: users create, rename, and delete lists stored as one Markdown file per list; each item is a GFM checkbox with optional text and an HTML-comment description. The GUI provides a list sidebar, per-item toggle/edit/trash rows, and a completed-item display filter; a modal dialog edits text and description together, and double-click opens the same dialog. A settings window offers light/dark/system theme choice (system reacts to macOS appearance changes), a completed-item cap, and an optional portable lists directory; it validates directories with clear error messages and persists choices immediately. Settings live in the fixed config dir, independent of the data dir. A themed dock icon is applied when available. The core (models, storage, settings, controller) is headless and importable without a display; `app.py` also hosts the full Tkinter GUI — its settings-window construction now lives in a dedicated module while the rest stays in `app.py`, the target of refactor series R1-R8. All 344 tests pass.
 
 ## Active Task
-**R1 (M)** — Extract the Settings window from `TodoApp` into `todo_md/settings_window.py`. R1.1 verified (`c85ed9b`); R1.2a + fix verified (tip `a518d23`, helpers relocated, frozen-test seam preserved, 344 pass/2 skip). Active micro-task: R1.2b (save flow) — last of R1.
-- Branch: `implementer/r1-settings-window` (base `main`; integration branch `main`). Checkpoint: `a518d23`.
+**R1 (M)** — Extract the Settings window from `TodoApp` into `todo_md/settings_window.py`. R1.1 verified (`c85ed9b`); R1.2a + fix verified (`a518d23`). R1.2b attempt TIMED OUT leaving UNCOMMITTED partial work in `settings_window.py` (architect-verified: full `on_save` ported faithfully, Save button rewired to `self.on_save`, docstrings updated, imports correct). Remaining: delete the old method from `app.py`, test, commit. Active micro-task: R1.2b-resume on the same branch.
+- Branch: `implementer/r1-settings-window` (base `main`; integration branch `main`). Checkpoint: `3be7e5a` + uncommitted `settings_window.py` changes (do NOT discard).
 - Scope: `implementer/src/todo_md/settings_window.py` + `implementer/src/todo_md/app.py` only.
 - Acceptance (task R1): settings construction AND save flow fully owned by `settings_window.py`; zero behavior change; full suite green with zero test edits; headless import intact.
 - Required tests: full suite; targeted `tests/test_gui_settings.py tests/test_gui_centering.py tests/test_gui_headless.py tests/test_startup.py`.
 - Commands (from `implementer/src/`): full `.venv/bin/python -m pytest tests -v`; targeted `.venv/bin/python -m pytest tests/test_gui_settings.py tests/test_gui_centering.py tests/test_gui_headless.py tests/test_startup.py -v`.
 
-### Implementer Prompt (micro-task R1.2b — save flow into SettingsWindow)
-Task R1.2b — Move the settings save flow from `TodoApp` into `SettingsWindow.on_save()`. This is the last piece of the R1 extraction.
-Branch: work only on `implementer/r1-settings-window` (already checked out at `a518d23`); base and integration branch is `main`. Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`.
+### Implementer Prompt (micro-task R1.2b-resume — finish the save-flow move)
+Task R1.2b-resume — Finish the R1.2b save-flow extraction. A previous run was cut off by the clock AFTER completing the `settings_window.py` side (an uncommitted `on_save` already exists there and is architect-verified; keep it). Only the `app.py` cleanup, tests, and commit remain.
+Branch: work only on `implementer/r1-settings-window` (checked out at `3be7e5a`; the working tree already contains the approved uncommitted `settings_window.py` changes — never discard or revert them). Base and integration branch is `main`. Never create/switch/merge/rebase/rename/delete/push branches; never commit to `main`.
 First tool call: run `../architect/tools/implementer-run.sh` with no arguments; use that wrapper for ALL later Bash commands; follow the Mandatory Execution Clock phase rules. Executing it is permitted; modifying it is forbidden.
-Before editing: verify the current branch and inspect the working tree (`git status --short`).
+Before editing: verify the current branch and inspect the working tree (`git status --short`); confirm `settings_window.py` already defines `SettingsWindow.on_save` and wires the Save button to it — if it does, skip straight to step 1.
 Scope — you may create/modify ONLY: `implementer/src/todo_md/settings_window.py` and `implementer/src/todo_md/app.py`.
 Forbidden: every file under `implementer/src/tests/`, everything under `architect/`, repository root, and all other `todo_md` modules.
-Work:
-1. Add `SettingsWindow.on_save(self)` in `settings_window.py`: port the entire `TodoApp._settings_on_save` body 1:1 (validation order, exact message texts, retry/error semantics preserved), with `self.` app state accessed via `self.app` where needed: `self.app.controller`, `self.app.config_dir`, `self.app.settings`, `self.app.data_dir`, `self.app.theme`, `self.app._apply_theme(...)`, `self.app._theme_btn.config(text=self.app._theme_button_text())`, `self.app._refresh_items()`, and finish with `self.app._close_settings()`.
-2. Module calls inside `on_save`: `decide_lists_dir(self.app, messagebox, target)`, `sync_lists_directory(self.app)`, `lists_dir_setting(...)` — same module already defined there.
-3. Persistence: call `app_module.save_settings(self.app.config_dir, new_settings)` (dynamic lookup — tests monkeypatch `todo_md.app.save_settings`). Build `new_settings` with `Settings(...)`, validate theme against `VALID_THEMES`, and re-apply with `resolve_theme(...)` — direct imports of those three are fine (never patched).
-4. Wire the Save button: in `SettingsWindow.__init__` the save button command becomes `self.on_save` (remove the `app._settings_on_save` reference).
-5. Delete `TodoApp._settings_on_save` from `app.py`. Keep the delegating `@property` entries and `_lists_dir_setting` seam exactly as they are; no other `app.py` changes EXCEPT updating docstrings that reference the moved save flow (e.g. `_open_settings` docstring, module docstring of `settings_window.py`) so the docs stay true.
-Hard invariants:
-- `import todo_md.app` stays headless; no top-level tkinter in `settings_window.py`.
-- Test-patched names via dynamic `app_module.<name>` lookup at call time: `save_settings`, `DEFAULT_DATA_DIR`, `_has_markdown`, `_valid_lists_dir_path`, `_same_dir`, `_normalize_dir`.
-- Zero test modifications; identical user-visible behavior (dialogs, strings, persistence).
-Acceptance: save flow fully owned by `settings_window.py`; `TodoApp` no longer defines `_settings_on_save`; full suite green.
+Work (nothing else):
+1. In `app.py`: delete `TodoApp._settings_on_save` entirely (method starts ~line 722). Also fix the now-stale docstring line at ~line 709 that references ``_settings_on_save`` (it now lives on `SettingsWindow.on_save`). No other `app.py` changes; keep the delegating properties and the `_lists_dir_setting` seam untouched.
+2. Verify no remaining references to `_settings_on_save` in `app.py`.
+3. Run targeted tests, then the full suite.
+4. Commit BOTH files together on `implementer/r1-settings-window` (the pre-commit hook may auto-stage a VERSION bump — that is expected; leave it).
+Hard invariants: zero test modifications; `import todo_md.app` stays headless; identical user-visible behavior.
+Acceptance: `TodoApp` no longer defines `_settings_on_save`; full suite green; working tree clean after commit.
 Commands (from `implementer/src/`): targeted `.venv/bin/python -m pytest tests/test_gui_settings.py tests/test_gui_centering.py tests/test_gui_headless.py tests/test_startup.py -v`; full `.venv/bin/python -m pytest tests -v`.
-On completion (or stabilized partial work): commit on `implementer/r1-settings-window`, then hand off with RESULT: SUCCESS|FAILURE, SUMMARY (3-5 bullets), BRANCH, COMMIT hash, and the test totals. If the clock budget is running low, run targeted tests first, commit, and report targeted totals.
+Handoff: RESULT: SUCCESS|FAILURE, SUMMARY (3-5 bullets), BRANCH, COMMIT hash, test totals. Keep edits minimal and commit early; the clock is the known risk.
 
 ## Queue
 - **R2 (S):** extract item-row rendering from `_refresh_items` into `todo_md/item_row.py`; collapse the five duplicated `{"bg": ...} if ... else {}` kwargs patterns into one helper.
