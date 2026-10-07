@@ -187,7 +187,9 @@ def sync_lists_directory(app) -> None:
     # Keep an accurate runtime path even if default equivalence cannot be read.
     app.settings.lists_dir = app_module._normalize_dir(app.data_dir)
     try:
-        app.settings.lists_dir = lists_dir_setting(app.settings.lists_dir)
+        # Frozen-test seam: routed through the instance attribute so tests
+        # can patch `TodoApp._lists_dir_setting`.
+        app.settings.lists_dir = app._lists_dir_setting(app.settings.lists_dir)
     finally:
         app.refresh_lists()
 

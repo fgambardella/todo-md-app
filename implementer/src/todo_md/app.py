@@ -662,6 +662,13 @@ class TodoApp:
         """The live Settings Toplevel, or None while the window is closed."""
         return self._settings.window if self._settings is not None else None
 
+    @staticmethod
+    def _lists_dir_setting(path: str) -> str | None:
+        """Persisted form of an effective directory: None for the default."""
+        from . import settings_window as sw  # lazy: keep module importable headless
+
+        return sw.lists_dir_setting(path)
+
     @property
     def _settings_lists_dir_var(self):
         return self._settings.lists_dir_var
