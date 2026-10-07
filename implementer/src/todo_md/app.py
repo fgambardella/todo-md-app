@@ -705,9 +705,9 @@ class TodoApp:
         """Open the Toplevel settings window (single instance).
 
         All construction lives in :class:`todo_md.settings_window.SettingsWindow`
-        (widgets, vars, handlers, centering); the Save flow stays on
-        :class:`TodoApp` (see ``_settings_on_save``); Cancel and the window
-        close handler both delegate back to ``_close_settings``.
+        (widgets, vars, handlers, centering), including the Save flow
+        (``SettingsWindow.on_save``); Cancel and the window close handler
+        both delegate back to ``_close_settings``.
         """
         if (
             self._settings is not None
@@ -718,107 +718,6 @@ class TodoApp:
         from .settings_window import SettingsWindow  # lazy: keep headless
 
         self._settings = SettingsWindow(self)
-
-    def _settings_on_save(self) -> None:
-        """Validate, apply the directory decision, persist, and live-apply; close.
-
-        Theme and completed-visible (int 0-999) are validated first, before
-        any filesystem check, prompt, creation, relocation, or persistence;
-        invalid input shows ``showerror`` and keeps the window open. A blank
-        entry means the actual ``DEFAULT_DATA_DIR``. Paths are normalized to
-        absolute form and compared with ``controller.store.data_dir``; an
-        equivalent path (including via symlinks) neither prompts nor relocates.
-        The effective default directory is always persisted as ``lists_dir:
-        null``.
-
-        For a changed target whose active directory holds Markdown lists, a
-        Yes/No/Cancel prompt asks whether to move them (Yes), switch without
-        moving (No), or keep the active directory (Cancel, which still
-        persists the other valid settings and never inspects or creates the
-        abandoned target). Empty, missing, or non-Markdown-only sources need
-        no prompt. The chosen target is validated only after the decision and
-        applied through ``controller.change_lists_dir``. Filesystem errors are
-        reported, never raised into Tk. The live view follows the bound store
-        even if relocation partially fails or preferences cannot be saved.
-        Completed moves are never rolled back.
-
-        A valid Save writes the full payload via ``save_settings``, replaces
-        the in-memory settings, then re-applies the theme and refreshes rows.
-        """
-        from tkinter import messagebox  # lazy: keep module importable headless
-        from . import settings_window as sw  # lazy: keep module importable headless
-
-        theme = self._settings_theme_var.get()
-        try:
-            completed = int(self._settings_spinbox.get().strip())
-        except ValueError:
-            completed = None
-        if completed is not None and not 0 <= completed <= 999:
-            completed = None
-
-        if completed is None:
-            messagebox.showerror(
-                "Settings",
-                "Completed items visible must be a whole number between 0 and 999.",
-            )
-            return
-        if theme not in VALID_THEMES:
-            messagebox.showerror(
-                "Settings", f"Unknown theme: {theme!r}."
-            )
-            return
-
-        old_dir = str(self.controller.store.data_dir)
-        target = self._settings_lists_dir_var.get()
-        try:
-            proceed, new_lists_dir = sw.decide_lists_dir(
-                self, messagebox, target
-            )
-            if not proceed:
-                return
-            sw.sync_lists_directory(self)
-            new_lists_dir = sw.lists_dir_setting(new_lists_dir)
-        except (OSError, UnicodeError) as e:
-            messagebox.showerror(
-                "Settings",
-                f"Could not inspect or refresh the lists folders from '{old_dir}' "
-                f"to '{_normalize_dir(target.strip() or DEFAULT_DATA_DIR)}':\n{e}\n\n"
-                f"The active lists folder is '{self.controller.store.data_dir}'. "
-                "Some files may already be at the destination; completed moves "
-                "have not been undone. The directory preference is not saved "
-                "for restart. You can retry Save.",
-            )
-            return
-
-        new_settings = Settings(
-            theme=theme,
-            lists_dir=new_lists_dir,
-            completed_visible=completed,
-        )
-
-        try:
-            save_settings(self.config_dir, new_settings)
-        except OSError as e:
-            messagebox.showerror(
-                "Settings save failed",
-                f"The directory preference could not be saved:\n{e}\n\n"
-                f"The active lists folder is '{self.controller.store.data_dir}'. "
-                "Its preference is not saved for restart. Completed moves have "
-                "not been undone. You can retry Save without moving files again.",
-            )
-            return
-
-        self.settings = new_settings
-
-        # Re-apply the theme exactly like the toggle button does, then
-        # refresh the current rows so the re-applied palette and the new
-        # completed-visible count take effect immediately.
-        self.theme = resolve_theme(new_settings)
-        self._apply_theme(self.theme)
-        self._theme_btn.config(text=self._theme_button_text())
-        self._refresh_items()
-
-        self._close_settings()
 
     def _close_settings(self) -> None:
         """Teardown: destroy the window (if alive) and drop the holder."""

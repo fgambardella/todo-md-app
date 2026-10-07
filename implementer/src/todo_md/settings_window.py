@@ -2,8 +2,8 @@
 
 Owns every widget of the Settings Toplevel (vars, lists-folder row, theme
 radios, completed spinbox, Save/Cancel/Reset/Browse buttons, close
-handler, centering) so ``TodoApp`` only instantiates and delegates. The
-Save flow itself stays on ``TodoApp`` (see ``_settings_on_save``).
+handler, centering) and the Save flow (``SettingsWindow.on_save``), so
+``TodoApp`` only instantiates and delegates.
 
 ``tkinter`` is imported lazily inside methods (never at module level) so
 this module remains importable on headless machines without a display.
@@ -11,9 +11,13 @@ this module remains importable on headless machines without a display.
 
 from __future__ import annotations
 
-# Dynamic module lookup: patchable names (DEFAULT_DATA_DIR) must be read
-# from the todo_md.app module at use time, never imported here.
+# Dynamic module lookup: patchable names (save_settings, DEFAULT_DATA_DIR,
+# the _dir/_markdown helpers) must be read from the todo_md.app module at
+# use time, never imported here.
 import todo_md.app as app_module
+
+# Headless settings primitives: never patched by tests, safe to import.
+from todo_md.settings import Settings, VALID_THEMES, resolve_theme
 
 
 class SettingsWindow:
@@ -91,9 +95,7 @@ class SettingsWindow:
         # (d) Save / Cancel ----------------------------------------------
         bottom = ttk.Frame(win, padding=(10, 8))
         bottom.pack(side=tk.BOTTOM)
-        self.save_btn = ttk.Button(
-            bottom, text="Save", command=self.app._settings_on_save
-        )
+        self.save_btn = ttk.Button(bottom, text="Save", command=self.on_save)
         self.save_btn.pack(side=tk.RIGHT, padx=(6, 0))
         self.cancel_btn = ttk.Button(
             bottom, text="Cancel", command=self._on_close
@@ -118,6 +120,106 @@ class SettingsWindow:
         )
         if path:
             self.lists_dir_var.set(path)
+
+    def on_save(self) -> None:
+        """Validate, apply the directory decision, persist, and live-apply; close.
+
+        Theme and completed-visible (int 0-999) are validated first, before
+        any filesystem check, prompt, creation, relocation, or persistence;
+        invalid input shows ``showerror`` and keeps the window open. A blank
+        entry means the actual ``DEFAULT_DATA_DIR``. Paths are normalized to
+        absolute form and compared with ``controller.store.data_dir``; an
+        equivalent path (including via symlinks) neither prompts nor relocates.
+        The effective default directory is always persisted as ``lists_dir:
+        null``.
+
+        For a changed target whose active directory holds Markdown lists, a
+        Yes/No/Cancel prompt asks whether to move them (Yes), switch without
+        moving (No), or keep the active directory (Cancel, which still
+        persists the other valid settings and never inspects or creates the
+        abandoned target). Empty, missing, or non-Markdown-only sources need
+        no prompt. The chosen target is validated only after the decision and
+        applied through ``controller.change_lists_dir``. Filesystem errors are
+        reported, never raised into Tk. The live view follows the bound store
+        even if relocation partially fails or preferences cannot be saved.
+        Completed moves are never rolled back.
+
+        A valid Save writes the full payload via ``save_settings``, replaces
+        the in-memory settings, then re-applies the theme and refreshes rows.
+        """
+        from tkinter import messagebox  # lazy: keep module importable headless
+
+        theme = self.theme_var.get()
+        try:
+            completed = int(self.spinbox.get().strip())
+        except ValueError:
+            completed = None
+        if completed is not None and not 0 <= completed <= 999:
+            completed = None
+
+        if completed is None:
+            messagebox.showerror(
+                "Settings",
+                "Completed items visible must be a whole number between 0 and 999.",
+            )
+            return
+        if theme not in VALID_THEMES:
+            messagebox.showerror(
+                "Settings", f"Unknown theme: {theme!r}."
+            )
+            return
+
+        old_dir = str(self.app.controller.store.data_dir)
+        target = self.lists_dir_var.get()
+        try:
+            proceed, new_lists_dir = decide_lists_dir(
+                self.app, messagebox, target
+            )
+            if not proceed:
+                return
+            sync_lists_directory(self.app)
+            new_lists_dir = lists_dir_setting(new_lists_dir)
+        except (OSError, UnicodeError) as e:
+            messagebox.showerror(
+                "Settings",
+                f"Could not inspect or refresh the lists folders from '{old_dir}' "
+                f"to '{app_module._normalize_dir(target.strip() or app_module.DEFAULT_DATA_DIR)}':\n{e}\n\n"
+                f"The active lists folder is '{self.app.controller.store.data_dir}'. "
+                "Some files may already be at the destination; completed moves "
+                "have not been undone. The directory preference is not saved "
+                "for restart. You can retry Save.",
+            )
+            return
+
+        new_settings = Settings(
+            theme=theme,
+            lists_dir=new_lists_dir,
+            completed_visible=completed,
+        )
+
+        try:
+            app_module.save_settings(self.app.config_dir, new_settings)
+        except OSError as e:
+            messagebox.showerror(
+                "Settings save failed",
+                f"The directory preference could not be saved:\n{e}\n\n"
+                f"The active lists folder is '{self.app.controller.store.data_dir}'. "
+                "Its preference is not saved for restart. Completed moves have "
+                "not been undone. You can retry Save without moving files again.",
+            )
+            return
+
+        self.app.settings = new_settings
+
+        # Re-apply the theme exactly like the toggle button does, then
+        # refresh the current rows so the re-applied palette and the new
+        # completed-visible count take effect immediately.
+        self.app.theme = resolve_theme(new_settings)
+        self.app._apply_theme(self.app.theme)
+        self.app._theme_btn.config(text=self.app._theme_button_text())
+        self.app._refresh_items()
+
+        self.app._close_settings()
 
     def _on_close(self) -> None:
         """Close handler: delegate the coordinated teardown to the app."""
