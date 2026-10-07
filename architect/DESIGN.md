@@ -38,5 +38,6 @@
 
 ## Known Architectural Debt
 
+- `app.py` (1276 lines) is a god class: `TodoApp` (~970 lines) intermixes seven responsibilities (main layout, theme engine, entry-placeholder mechanism, settings window ~250 lines, edit dialog, item-row rendering, dialog centering/dock icon) and also hosts `TodoController` plus headless helpers. Duplicated patterns: `bg`-kwargs dict built five times in `_refresh_items`, `current_list is None` guard four times, `nonlocal` closures in the controller. Being split by refactor series R1-R8 (plan in `TASKS.md`; tests frozen for the series).
 - Filtered completion display and relocation/retry logic live in the controller, a growing class worth watching for a settings-domain split.
 - GUI tests depend on a local display and geometry on the local display; no headless fallback.
