@@ -1,9 +1,8 @@
 """GUI for the todo_md package.
 
-``TodoController`` lives in ``controller.py`` (headless, no GUI imports)
-and is re-exported here for compatibility. ``TodoApp`` is a
-``tkinter`` frontend; tkinter is imported lazily *inside* methods so the
-module remains importable on headless machines without a display.
+``TodoController`` is re-exported from ``controller.py``; ``TodoApp`` is a
+tkinter frontend, imported lazily inside methods so this module stays
+importable on headless machines.
 """
 
 from __future__ import annotations
@@ -43,17 +42,8 @@ DEFAULT_DATA_DIR = os.path.join(DEFAULT_APP_ROOT, "lists")
 def startup_dirs(config_dir: str | None = None) -> tuple[str, str, Settings]:
     """Startup ordering: load settings first, then derive the data dir.
 
-    Returns ``(config_dir, data_dir, settings)`` where:
-
-    * ``config_dir`` is the fixed config dir (``~/.todo-md-app/config`` by
-      default, or an explicit override) — it is *never* inside the lists
-      dir and changing the lists dir never moves the settings file;
-    * ``data_dir`` is the effective lists dir: ``settings.lists_dir`` when
-      saved, else ``~/.todo-md-app/lists`` (created on demand).
-
-    Headless (no tkinter) so the startup flow is testable without a
-    display. Callers build the store/controller from the returned
-    ``data_dir``.
+    Returns ``(config_dir, data_dir, settings)``: the fixed config dir, the
+    effective lists dir (created on demand), and the loaded settings.
     """
     cfg = config_dir if config_dir is not None else DEFAULT_CONFIG_DIR
     settings = load_settings(cfg)
@@ -120,12 +110,10 @@ def _has_markdown(directory: str) -> bool:
 class TodoApp:
     """tkinter front-end for :class:`TodoController`.
 
-    Left frame: list of lists with create/delete controls.
-    Right frame: checkbutton-backed item rows plus an entry+button to add
-    items. The UI refreshes after every mutation.
-
-    ``tkinter`` is imported inside methods so constructing / importing
-    this class's module never requires a display.
+    Left frame: list of lists with create/delete controls. Right frame:
+    checkbutton-backed item rows plus an entry+button to add items. The UI
+    refreshes after every mutation; ``tkinter`` is imported inside methods
+    so importing this module never requires a display.
     """
 
     def __init__(
@@ -138,10 +126,7 @@ class TodoApp:
 
         self.controller = controller
         self.data_dir = data_dir if data_dir is not None else self.controller.data_dir
-        # Theme settings live in a dedicated config dir that is FIXED at
-        # ~/.todo-md-app/config (or an explicit override): it is never
-        # derived from the lists dir, so changing the lists path never
-        # moves the settings file.
+        # Config dir is FIXED at ~/.todo-md-app/config (or an explicit override); never derived from the lists dir.
         self.config_dir = (
             config_dir if config_dir is not None else DEFAULT_CONFIG_DIR
         )
@@ -165,21 +150,12 @@ class TodoApp:
         self._dock_icon = None
         self._apply_dock_icon()
 
-        # Theme: load settings and resolve (system detection is never
-        # persisted) before the UI is built so every widget starts in the
-        # right palette.
+        # Resolve the theme before building the UI so every widget starts in the right palette.
         self.settings = load_settings(self.config_dir)
         self.theme = resolve_theme(self.settings)
         self._apply_theme(self.theme)
 
-        # Cached trash-bin icon (pre-sized 18x18 asset; source 512x512 kept in assets/).
-        self._trash_image = tk.PhotoImage(
-            file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "trash_18.png")
-        )
-        # Cached pencil edit icon (pre-sized 18x18 asset; source 512x512 kept in assets/).
-        self._edit_image = tk.PhotoImage(
-            file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "edit_18.png")
-        )
+        self._load_icon_assets()
 
         self._build_ui()
         # Re-apply after the UI exists: the fallback palette must set
@@ -193,6 +169,14 @@ class TodoApp:
         self.root.geometry(f"{max(700, width)}x{max(420, height)}")
         self.refresh_lists(select_first=True)
 
+    def _load_icon_assets(self) -> None:
+        """Cache the pre-sized 18x18 trash and edit icons (refs kept alive on self)."""
+        import tkinter as tk  # lazy: keep module importable headless
+
+        assets = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+        self._trash_image = tk.PhotoImage(file=os.path.join(assets, "trash_18.png"))
+        self._edit_image = tk.PhotoImage(file=os.path.join(assets, "edit_18.png"))
+
     # -- construction -----------------------------------------------------
 
     def _build_ui(self) -> None:
@@ -200,12 +184,8 @@ class TodoApp:
         from tkinter import ttk
 
         # --- version badge: bottom-right, unobtrusive --------------------
-        # Packed first (side=bottom) so the left/right frames fill only the
-        # remaining space and the existing layout is undisturbed.
-        # Fallback (clam) path: pin the background to the palette bg, since an
-        # unset tk bg stays on the system color and does not flip. Native path
-        # (self._palette is None): leave the background unset so it inherits
-        # the root and flips with `tk appappearance`.
+        # Packed first (side=bottom) so the left/right frames fill only the remaining space.
+        # Fallback (clam) path: pin bg to the palette (unset tk bg stays on the system color); native path: leave unset.
         version_fg = (self._palette or {}).get("version_fg", "#808080")
         from .item_row import bg_kwargs
 
@@ -287,16 +267,7 @@ class TodoApp:
         return button_text(self.theme)
 
     def _apply_theme(self, theme: str) -> None:
-        """Apply 'dark'/'light' to the running GUI.
-
-        Primary path: ``tk appappearance`` (Tk 9) — keeps the native aqua
-        look in either theme.  Fallback (``tk.TclError``): ttk "clam"
-        theme with explicit palettes, since plain tk widgets resolve an
-        unset background to a *system* color that does not flip.
-
-        Delegates to :func:`todo_md.theme.apply_theme`; ``self._palette``
-        is ``None`` on the native path, the fallback palette dict otherwise.
-        """
+        """Apply 'dark'/'light' to the running GUI (delegates to todo_md.theme.apply_theme)."""
         from .theme import apply_theme  # lazy: keep module importable headless
 
         # Sync so the theme engine can read it off the app holder.
@@ -306,15 +277,7 @@ class TodoApp:
     # -- dock icon --------------------------------------------------------
 
     def _apply_dock_icon(self) -> None:
-        """Set the macOS dock icon from the bundled PNG asset (fail-soft).
-
-        ``PhotoImage`` cannot decode the source JPEG, so a PNG conversion
-        (``dock_icon.png``) is committed alongside it. The image is kept
-        alive on ``self._dock_icon`` — a tkinter image held only by the
-        interpreter would otherwise be garbage-collected. If the icon file
-        is missing or unreadable, the icon is skipped and the app runs
-        normally.
-        """
+        """Set the macOS dock icon from the bundled PNG asset (fail-soft; ref kept on self)."""
         from .dialogs import apply_dock_icon  # lazy: keep module importable headless
 
         self._dock_icon = apply_dock_icon(self.root)
@@ -322,13 +285,7 @@ class TodoApp:
     # -- entry placeholders ----------------------------------------------
 
     def _attach_placeholder(self, entry, text: str) -> None:
-        """Show ``text`` as a muted placeholder on ``entry``.
-
-        The hint is removed the instant the entry gains focus (only when it
-        is still the displayed content) and restored when focus leaves an
-        empty entry. A displayed placeholder is treated as empty by the
-        submit handlers, so it can never be created as a list/item.
-        """
+        """Show ``text`` as a muted placeholder on ``entry`` (delegates to the binder)."""
         self._ph.attach(entry, text)
 
     def _placeholder_fg(self) -> str:
@@ -346,12 +303,7 @@ class TodoApp:
         self._ph.focus_out(entry)
 
     def _restore_placeholder(self, entry) -> None:
-        """Re-show the placeholder on an empty entry that no longer has focus.
-
-        While the entry still holds the focus (e.g. right after a submit
-        that cleared it), writing the hint would leave stale placeholder
-        text in a focused field, since no FocusIn will re-fire to clear it.
-        """
+        """Re-show the placeholder on an empty, unfocused entry (delegates to the binder)."""
         self._ph.restore(entry)
 
     def _on_toggle_theme(self) -> None:
@@ -365,16 +317,7 @@ class TodoApp:
         self._refresh_items()
 
     def _center_window_on_parent(self, win) -> None:
-        """Center ``win`` over the main window's current on-screen rectangle.
-
-        Call after the dialog's size geometry has been set (or after its
-        first ``update``). The position is recomputed on every open from
-        the live parent geometry, so a moved main window re-centers the
-        dialog on the next open. Placement is self-correcting: after the
-        initial ``geometry('+x+y')`` the actual on-screen rectangles are
-        re-measured and one corrective nudge removes any window-manager
-        frame offset (e.g. the ~title-bar-height shift on macOS).
-        """
+        """Center ``win`` over the live main window (delegates to dialogs.center_window_on_parent)."""
         from .dialogs import center_window_on_parent  # lazy: keep module importable headless
 
         win.update_idletasks()
@@ -427,13 +370,7 @@ class TodoApp:
         return self._settings.reset_btn
 
     def _open_settings(self) -> None:
-        """Open the Toplevel settings window (single instance).
-
-        All construction lives in :class:`todo_md.settings_window.SettingsWindow`
-        (widgets, vars, handlers, centering), including the Save flow
-        (``SettingsWindow.on_save``); Cancel and the window close handler
-        both delegate back to ``_close_settings``.
-        """
+        """Open the Toplevel settings window (single instance; construction in SettingsWindow)."""
         if (
             self._settings is not None
             and self._settings.window.winfo_exists()
@@ -534,55 +471,18 @@ class TodoApp:
         return text_colors(self.root, reference_widget)
 
     def _refresh_items(self) -> None:
-        from tkinter import font as tkfont
-
         for widget in self.items_frame.winfo_children():
             widget.destroy()
         self._item_rows = []
+        from .item_row import rebuild_rows  # lazy: keep module importable headless
 
-        if self.current_list is None:
-            self.title_label.config(text="(no list selected)")
-            return
-
-        base_font = tkfont.nametofont("TkDefaultFont").copy()
-        active_fg, done_fg = self._text_colors(self.items_frame)
-
-        from .item_row import build_item_row
-
-        todo_list = self.controller.open_list(self.current_list)
-        row_bg = self._palette["bg"] if self._palette is not None else None
-        # Display order can differ from storage; equal duplicate items still
-        # need their own original indices for toggle/delete callbacks.
-        stored_indexes = {id(item): index for index, item in enumerate(todo_list.items)}
-        for item in visible_items(todo_list.items, self.settings.completed_visible):
-            index = stored_indexes[id(item)]
-            self._item_rows.append(
-                build_item_row(
-                    self.items_frame,
-                    item=item,
-                    index=index,
-                    row_bg=row_bg,
-                    active_fg=active_fg,
-                    done_fg=done_fg,
-                    base_font=base_font,
-                    trash_image=self._trash_image,
-                    edit_image=self._edit_image,
-                    on_toggle=self._on_toggle_item,
-                    on_delete=self._on_delete_item,
-                    on_edit=self._on_edit_item,
-                    on_double_click=self._on_item_double_click,
-                )
-            )
+        rebuild_rows(self)
 
     def _on_toggle_item(self, index: int) -> None:
-        if self.current_list is None:
-            return
         self.controller.toggle_item(self.current_list, index)
         self._refresh_items()
 
     def _on_delete_item(self, index: int) -> None:
-        if self.current_list is None:
-            return
         from tkinter import messagebox  # lazy: keep module importable headless
 
         text = self.controller.open_list(self.current_list).items[index].text
@@ -593,18 +493,10 @@ class TodoApp:
 
     def _on_edit_item(self, index: int) -> None:
         """Open the modal edit dialog for the item at ``index``."""
-        if self.current_list is None:
-            return
         self._open_edit_dialog(index)
 
     def _on_item_double_click(self, index: int) -> None:
-        """Open the edit dialog when an unfinished item's text is double-clicked.
-
-        Mirrors the edit-icon path (same pre-populated modal). Completed
-        items ignore the double-click so no dialog opens for them.
-        """
-        if self.current_list is None:
-            return
+        """Open the edit dialog when an unfinished item's text is double-clicked."""
         item = self.controller.open_list(self.current_list).items[index]
         if item.done:
             return
@@ -631,18 +523,7 @@ class TodoApp:
         return self._edit.cancel_btn if self._edit is not None else None
 
     def _open_edit_dialog(self, index: int) -> None:
-        """Open a theme-aware modal dialog to edit the item's title and description.
-
-        All construction lives in :class:`todo_md.edit_dialog.EditItemDialog`
-        (Toplevel, theme bg, transient, pre-populated title entry and
-        multi-line description box, save/cancel buttons, grab, centering);
-        Save delegates to ``_on_edit_save`` (which calls
-        ``controller.edit_item`` with both, then closes the dialog and
-        refreshes the list; empty/whitespace-only input raises ValueError in
-        the controller and persists nothing, but the dialog still closes)
-        and Cancel and the window close handler delegate to
-        ``_close_edit_dialog``.
-        """
+        """Open a theme-aware modal edit dialog (construction in EditItemDialog)."""
         if self.current_list is None:
             return
         from .edit_dialog import EditItemDialog  # lazy: keep module importable headless
@@ -700,12 +581,7 @@ class TodoApp:
 
 
 def run(config_dir: str | None = None) -> None:
-    """Build the controller + :class:`TodoApp` and start the main loop.
-
-    Startup order: load settings from the fixed config dir, derive the
-    effective lists data dir from ``settings.lists_dir`` (or the default,
-    created on demand), then build the store/controller with it.
-    """
+    """Build the controller + :class:`TodoApp` and start the main loop."""
     cfg, data_dir, _settings = startup_dirs(config_dir)
     store = MarkdownListStore(data_dir)
     controller = TodoController(store, data_dir=data_dir)

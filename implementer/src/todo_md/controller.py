@@ -76,35 +76,24 @@ class TodoController:
 
     # -- item-level operations (load -> mutate -> save) -------------------
 
-    def _load_and_save(self, name: str, mutate) -> TodoList:
-        todo_list = self.open_list(name)
-        mutate(todo_list)
-        self.store.save(
-            name, [(item.text, item.done, item.description) for item in todo_list.items]
-        )
-        return todo_list
-
     def add_item(self, name: str, text: str) -> TodoItem:
         """Add an item to the list and persist the change."""
         if not text or not text.strip():
             raise ValueError("todo item text must not be empty")
-
-        def _mutate(todo_list: TodoList) -> None:
-            todo_list.add_item(text)
-
-        todo_list = self._load_and_save(name, _mutate)
+        todo_list = self.open_list(name)
+        todo_list.add_item(text)
+        self.store.save(
+            name, [(i.text, i.done, i.description) for i in todo_list.items]
+        )
         return todo_list.items[-1]
 
     def toggle_item(self, name: str, index: int) -> TodoItem:
         """Flip the done state of the item at ``index`` and persist it."""
-
-        toggled = None
-
-        def _mutate(todo_list: TodoList) -> None:
-            nonlocal toggled
-            toggled = todo_list.toggle(index)
-
-        self._load_and_save(name, _mutate)
+        todo_list = self.open_list(name)
+        toggled = todo_list.toggle(index)
+        self.store.save(
+            name, [(i.text, i.done, i.description) for i in todo_list.items]
+        )
         return toggled
 
     def edit_item(
@@ -135,12 +124,9 @@ class TodoController:
 
     def remove_item(self, name: str, index: int) -> TodoItem:
         """Remove the item at ``index`` and persist the change."""
-
-        removed = None
-
-        def _mutate(todo_list: TodoList) -> None:
-            nonlocal removed
-            removed = todo_list.remove(index)
-
-        self._load_and_save(name, _mutate)
+        todo_list = self.open_list(name)
+        removed = todo_list.remove(index)
+        self.store.save(
+            name, [(i.text, i.done, i.description) for i in todo_list.items]
+        )
         return removed
