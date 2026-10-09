@@ -17,6 +17,7 @@
 - `implementer/src/todo_md/storage.py` — persistence: `MarkdownListStore`, one `<Name>.md` per list, atomic writes, name sanitization.
 - `implementer/src/todo_md/app.py` — `TodoController` (UI-agnostic view-model; every mutation persists immediately) and `TodoApp` (Tkinter GUI: sidebar list management, checkbutton item rows with edit/trash icons, add entry, modal edit dialog, settings window, confirmations; dialogs opened centered on the main window via the self-correcting `_center_window_on_parent` placement). `TodoApp` instantiates and delegates to the settings window; tkinter imports stay lazy to keep the module importable headless.
 - `implementer/src/todo_md/settings_window.py` — `SettingsWindow` owns all settings-window construction and the Save flow (widgets, vars, browse, directory decision/sync via module helpers `decide_lists_dir`, `sync_lists_directory`, `lists_dir_setting`); lazy-imported from `app.py`.
+- `implementer/src/todo_md/item_row.py` — `build_item_row` builds one packed item row (checkbutton, trash + edit icons, text label with per-item callbacks) and returns the 5-tuple stored in `TodoApp._item_rows`; `bg_kwargs` collapses the conditional-bg widget-kwargs pattern; everything arrives as parameters, tkinter lazy-imported, never imports `todo_md.app`.
 - `implementer/src/todo_md/settings.py` — headless `Settings` load/save and theme resolution; settings GUI has Save/Cancel, directory change with optional list movement.
 - `implementer/src/todo_md/version.py` — headless `get_version()` from `todo_md/VERSION`.
 - `implementer/src/todo_md/__main__.py` — entry point `run()` wiring controller + GUI.
@@ -39,6 +40,6 @@
 
 ## Known Architectural Debt
 
-- `app.py` (1063 lines) is a god class: `TodoApp` (~790 lines) intermixes six responsibilities (main layout, theme engine, entry-placeholder mechanism, edit dialog, item-row rendering, dialog centering/dock icon) and also hosts `TodoController` plus headless helpers; the settings window already split out to `settings_window.py` (R1). Duplicated patterns: `bg`-kwargs dict built five times in `_refresh_items`, `current_list is None` guard four times, `nonlocal` closures in the controller. Being split by refactor series R2-R8 (plan in `TASKS.md`; tests frozen for the series).
+- `app.py` (1035 lines) is a god class: `TodoApp` (~760 lines) intermixes five responsibilities (main layout, theme engine, entry-placeholder mechanism, edit dialog, dialog centering/dock icon) and also hosts `TodoController` plus headless helpers; the settings window and item-row rendering already split out to `settings_window.py` / `item_row.py` (R1/R2). Duplicated patterns: `current_list is None` guard four times, `nonlocal` closures in the controller. Being split by refactor series R3-R8 (plan in `TASKS.md`; tests frozen for the series).
 - Filtered completion display and relocation/retry logic live in the controller, a growing class worth watching for a settings-domain split.
 - GUI tests depend on a local display and geometry on the local display; no headless fallback.

@@ -355,8 +355,10 @@ class TodoApp:
         # (self._palette is None): leave the background unset so it inherits
         # the root and flips with `tk appappearance`.
         version_fg = (self._palette or {}).get("version_fg", "#808080")
-        version_kwargs = (
-            {"background": self._palette["bg"]} if self._palette is not None else {}
+        from .item_row import bg_kwargs
+
+        version_kwargs = bg_kwargs(
+            self._palette["bg"] if self._palette is not None else None, key="background"
         )
         self.version_label = tk.Label(
             self.root,
@@ -826,7 +828,6 @@ class TodoApp:
         return ("#000000", "#808080")
 
     def _refresh_items(self) -> None:
-        import tkinter as tk
         from tkinter import font as tkfont
 
         for widget in self.items_frame.winfo_children():
@@ -840,6 +841,8 @@ class TodoApp:
         base_font = tkfont.nametofont("TkDefaultFont").copy()
         active_fg, done_fg = self._text_colors(self.items_frame)
 
+        from .item_row import build_item_row
+
         todo_list = self.controller.open_list(self.current_list)
         row_bg = self._palette["bg"] if self._palette is not None else None
         # Display order can differ from storage; equal duplicate items still
@@ -847,54 +850,23 @@ class TodoApp:
         stored_indexes = {id(item): index for index, item in enumerate(todo_list.items)}
         for item in visible_items(todo_list.items, self.settings.completed_visible):
             index = stored_indexes[id(item)]
-            row_kwargs = {"bg": row_bg} if row_bg is not None else {}
-            row = tk.Frame(self.items_frame, **row_kwargs)
-            row.pack(anchor="w", fill=tk.X)
-
-            var = tk.IntVar(value=1 if item.done else 0)
-            cb_kwargs = {"bg": row_bg} if row_bg is not None else {}
-            cb = tk.Checkbutton(
-                row,
-                variable=var,
-                command=lambda i=index: self._on_toggle_item(i),
-                **cb_kwargs,
+            self._item_rows.append(
+                build_item_row(
+                    self.items_frame,
+                    item=item,
+                    index=index,
+                    row_bg=row_bg,
+                    active_fg=active_fg,
+                    done_fg=done_fg,
+                    base_font=base_font,
+                    trash_image=self._trash_image,
+                    edit_image=self._edit_image,
+                    on_toggle=self._on_toggle_item,
+                    on_delete=self._on_delete_item,
+                    on_edit=self._on_edit_item,
+                    on_double_click=self._on_item_double_click,
+                )
             )
-            cb.pack(side=tk.LEFT, padx=(4, 6))
-
-            del_kwargs = {"bg": row_bg} if row_bg is not None else {}
-            del_ctrl = tk.Label(row, image=self._trash_image, cursor="hand2", **del_kwargs)
-            del_ctrl.pack(side=tk.RIGHT, padx=(6, 4))
-            del_ctrl.bind("<Button-1>", lambda e, i=index: self._on_delete_item(i))
-
-            # Edit (pencil) icon: packed after the trash icon, so with the
-            # same side=RIGHT it lands strictly to its left.
-            edit_kwargs = {"bg": row_bg} if row_bg is not None else {}
-            edit_ctrl = tk.Label(row, image=self._edit_image, cursor="hand2", **edit_kwargs)
-            edit_ctrl.pack(side=tk.RIGHT, padx=(6, 0))
-            edit_ctrl.bind("<Button-1>", lambda e, i=index: self._on_edit_item(i))
-
-            label_font = base_font.copy()
-            if item.done:
-                label_font.config(overstrike=1)
-            else:
-                label_font.config(overstrike=0)
-
-            label_kwargs = {"bg": row_bg} if row_bg is not None else {}
-            label = tk.Label(
-                row,
-                text=item.text,
-                anchor="w",
-                font=label_font,
-                foreground=done_fg if item.done else active_fg,
-                **label_kwargs,
-            )
-            label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            label.bind(
-                "<Double-Button-1>",
-                lambda _e, i=index: self._on_item_double_click(i),
-            )
-
-            self._item_rows.append((var, cb, label, del_ctrl, edit_ctrl))
 
     def _on_toggle_item(self, index: int) -> None:
         if self.current_list is None:
