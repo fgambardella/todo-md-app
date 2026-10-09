@@ -4,23 +4,31 @@ tkinter is imported lazily inside each function so this module stays
 importable headless (mirrors ``todo_md.app``).
 """
 
+import os
 
-def apply_dock_icon(root):
-    """Set the macOS dock icon from the bundled PNG asset (fail-soft).
 
-    ``PhotoImage`` cannot decode the source JPEG, so a PNG conversion
-    (``dock_icon.png``) is committed alongside it. The returned image is
-    kept alive by the caller (``self._dock_icon`` on the app) — a tkinter
-    image held only by the interpreter would otherwise be
-    garbage-collected. If the icon file is missing or unreadable, ``None``
-    is returned and the app runs normally.
+def dock_icon_path() -> str:
+    """Package-relative path to the PNG dock icon asset."""
+    return os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "assets", "dock_icon.png"
+    )
+
+
+def apply_dock_icon(root, icon_path: str):
+    """Set the macOS dock icon from the PNG at ``icon_path`` (fail-soft).
+
+    The caller resolves the icon path (see ``dock_icon_path``); this
+    function only consumes it. ``PhotoImage`` cannot decode the source
+    JPEG, so a PNG conversion (``dock_icon.png``) is committed alongside
+    it. The returned image is kept alive by the caller
+    (``self._dock_icon`` on the app) — a tkinter image held only by the
+    interpreter would otherwise be garbage-collected. If the icon file is
+    missing or unreadable, ``None`` is returned and the app runs normally.
     """
     import tkinter as tk
 
-    from . import app as app_module
-
     try:
-        photo = tk.PhotoImage(file=app_module.dock_icon_path())
+        photo = tk.PhotoImage(file=icon_path)
     except tk.TclError:
         return None
     try:
