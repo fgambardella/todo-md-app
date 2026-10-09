@@ -19,6 +19,7 @@ from .settings import (
     save_settings,  # headless module (stdlib only)
 )
 from .version import get_version  # headless module (no tkinter)
+from .placeholders import PlaceholderBinder  # headless module (no tkinter)
 
 __all__ = [
     "TodoController",
@@ -298,9 +299,10 @@ class TodoApp:
         self._edit_index: int | None = None
         self._item_rows: list[tuple] = []
         self._palette: dict | None = None
-        # entry widget -> its placeholder text (empty fields show this muted
-        # hint; a displayed placeholder counts as "empty" for submission).
-        self._placeholders: dict = {}
+        # Placeholder mechanism holder; ``_placeholders`` is an alias for
+        # the binder's map so existing readers (theme, tests) keep working.
+        self._ph = PlaceholderBinder(self)
+        self._placeholders = self._ph.map
 
         self.root = tk.Tk()
         self.root.title("TODO Markdown App")
@@ -484,30 +486,21 @@ class TodoApp:
         empty entry. A displayed placeholder is treated as empty by the
         submit handlers, so it can never be created as a list/item.
         """
-        self._placeholders[entry] = text
-        entry.insert(0, text)
-        entry.configure(foreground=self._placeholder_fg())
-        entry.bind("<FocusIn>", lambda _e, e=entry: self._on_entry_focus_in(e))
-        entry.bind("<FocusOut>", lambda _e, e=entry: self._on_entry_focus_out(e))
+        self._ph.attach(entry, text)
 
     def _placeholder_fg(self) -> str:
         """Muted gray for placeholder text in the current (fallback) theme."""
-        return (self._palette or {}).get("placeholder_fg", "#808080")
+        return self._ph.fg()
 
     def _entry_value(self, entry) -> str:
         """Strip the entry's text; a displayed placeholder counts as empty."""
-        if entry.get() == self._placeholders.get(entry, ""):
-            return ""
-        return entry.get().strip()
+        return self._ph.value(entry)
 
     def _on_entry_focus_in(self, entry) -> None:
-        if entry.get() == self._placeholders.get(entry, ""):
-            entry.delete(0, "end")
-            entry.configure(foreground=(self._palette or {}).get("fg", "#000000"))
+        self._ph.focus_in(entry)
 
     def _on_entry_focus_out(self, entry) -> None:
-        if entry.get().strip() == "":
-            self._restore_placeholder(entry)
+        self._ph.focus_out(entry)
 
     def _restore_placeholder(self, entry) -> None:
         """Re-show the placeholder on an empty entry that no longer has focus.
@@ -516,11 +509,7 @@ class TodoApp:
         that cleared it), writing the hint would leave stale placeholder
         text in a focused field, since no FocusIn will re-fire to clear it.
         """
-        if self.root.focus_get() is entry:
-            return
-        entry.delete(0, "end")
-        entry.insert(0, self._placeholders[entry])
-        entry.configure(foreground=self._placeholder_fg())
+        self._ph.restore(entry)
 
     def _on_toggle_theme(self) -> None:
         new = "light" if self.theme == "dark" else "dark"
