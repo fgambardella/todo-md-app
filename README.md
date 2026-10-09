@@ -22,7 +22,8 @@ The code lives in `src/todo_md/` and is layered so that all business logic is te
 src/
 ├── todo_md/
 │   ├── __init__.py     # package exports (domain, storage, settings, version)
-│   ├── models.py       # Domain layer: TodoItem, TodoList dataclasses
+│   ├── models.py       # Domain layer: TodoItem, TodoList dataclasses + visible_items filter
+│   ├── controller.py   # Headless view-model (every mutation persists); re-exported by app.py
 │   ├── storage.py      # Persistence layer: MarkdownListStore
 │   ├── settings.py     # Headless settings (Settings, load/save, theme resolution)
 │   ├── version.py      # Headless version loader (get_version)
