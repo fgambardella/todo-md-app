@@ -77,3 +77,22 @@ class TodoList:
     def rename(self, new_name: str) -> None:
         """Rename this list."""
         self.name = new_name
+
+
+def visible_items(
+    items: list[TodoItem], completed_visible: int
+) -> list[TodoItem]:
+    """Show the newest N completions, oldest-first, then all incomplete items.
+
+    Relative completed order in ``items`` records completion order, including
+    legacy interleaved files. ``completed_visible`` must be >= 0; zero hides
+    all completions. Incomplete items keep their relative order.
+
+    This never touches storage: the on-disk list keeps every item; the
+    result is a new list (never the input) for display only.
+    """
+    if completed_visible < 0:
+        raise ValueError(f"completed_visible must be >= 0, got {completed_visible!r}")
+    completed = [item for item in items if item.done]
+    incomplete = [item for item in items if not item.done]
+    return (completed[-completed_visible:] if completed_visible else []) + incomplete
