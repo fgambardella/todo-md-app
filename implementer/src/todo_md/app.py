@@ -10,7 +10,8 @@ from __future__ import annotations
 import os
 
 from .models import visible_items
-from .storage import MarkdownListStore, relocate_lists  # kept: frozen tests patch app.relocate_lists
+from .storage import MarkdownListStore
+from .dialogs import dock_icon_path  # re-export: tests import/patch it on todo_md.app (dialogs is stdlib-only, so a top-level import keeps the module headless)
 from .controller import TodoController
 from .settings import (
     Settings,
@@ -50,13 +51,6 @@ def startup_dirs(config_dir: str | None = None) -> tuple[str, str, Settings]:
     data_dir = settings.lists_dir or DEFAULT_DATA_DIR
     os.makedirs(data_dir, exist_ok=True)
     return cfg, data_dir, settings
-
-
-def dock_icon_path() -> str:
-    """Package-relative path to the PNG dock icon asset."""
-    return os.path.join(
-        os.path.dirname(os.path.abspath(__file__)), "assets", "dock_icon.png"
-    )
 
 
 def _valid_lists_dir_path(path: str) -> bool:
@@ -280,7 +274,7 @@ class TodoApp:
         """Set the macOS dock icon from the bundled PNG asset (fail-soft; ref kept on self)."""
         from .dialogs import apply_dock_icon  # lazy: keep module importable headless
 
-        self._dock_icon = apply_dock_icon(self.root)
+        self._dock_icon = apply_dock_icon(self.root, dock_icon_path())
 
     # -- entry placeholders ----------------------------------------------
 

@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from todo_md import app as app_module
+from todo_md import controller as controller_module
 from todo_md.app import TodoController
 from todo_md.models import TodoItem, TodoList
 from todo_md.storage import MarkdownListStore
@@ -509,7 +510,7 @@ def test_change_lists_dir_relocation_error_keeps_bindings(tmp_path, monkeypatch,
         assert should_move is move
         raise failure
 
-    monkeypatch.setattr(app_module, "relocate_lists", fail_relocation)
+    monkeypatch.setattr(controller_module, "relocate_lists", fail_relocation)
 
     with pytest.raises(OSError, match="injected relocation failure") as exc:
         controller.change_lists_dir(target, move=move)
@@ -545,7 +546,7 @@ def test_change_lists_dir_equivalent_path_is_noop(tmp_path, monkeypatch, move, p
     def unexpected_relocation(*args, **kwargs):
         pytest.fail("same-directory requests must not call relocation")
 
-    monkeypatch.setattr(app_module, "relocate_lists", unexpected_relocation)
+    monkeypatch.setattr(controller_module, "relocate_lists", unexpected_relocation)
 
     controller.change_lists_dir(target, move=move)
 

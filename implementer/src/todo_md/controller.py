@@ -42,9 +42,7 @@ class TodoController:
         except FileNotFoundError:
             pass  # Relocation handles missing source/destination directories.
 
-        from . import app  # compat: frozen tests patch relocate_lists on todo_md.app
-
-        app.relocate_lists(old_dir, new_dir, move)
+        relocate_lists(old_dir, new_dir, move)
         new_store = MarkdownListStore(new_dir)
         self.store = new_store
         self.data_dir = new_store.data_dir
