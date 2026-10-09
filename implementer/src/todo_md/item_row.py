@@ -92,3 +92,47 @@ def build_item_row(
     label.bind("<Double-Button-1>", lambda _e, i=index: on_double_click(i))
 
     return var, checkbutton, label, trash_label, edit_label
+
+
+def rebuild_rows(app) -> None:
+    """Rebuild the rows of ``app.items_frame`` for ``app.current_list``.
+
+    ``app`` is duck-typed (a ``TodoApp``) so this module never imports
+    :mod:`todo_md.app`; tkinter and :func:`.theme.text_colors` are imported
+    lazily so the module stays importable on headless machines.
+    """
+    from tkinter import font as tkfont
+    from .models import visible_items
+    from .theme import text_colors  # lazy: keep module importable headless
+
+    if app.current_list is None:
+        app.title_label.config(text="(no list selected)")
+        return
+
+    base_font = tkfont.nametofont("TkDefaultFont").copy()
+    active_fg, done_fg = text_colors(app.root, app.items_frame)
+
+    todo_list = app.controller.open_list(app.current_list)
+    row_bg = app._palette["bg"] if app._palette is not None else None
+    # Display order can differ from storage; equal duplicate items still
+    # need their own original indices for toggle/delete callbacks.
+    stored_indexes = {id(item): index for index, item in enumerate(todo_list.items)}
+    for item in visible_items(todo_list.items, app.settings.completed_visible):
+        index = stored_indexes[id(item)]
+        app._item_rows.append(
+            build_item_row(
+                app.items_frame,
+                item=item,
+                index=index,
+                row_bg=row_bg,
+                active_fg=active_fg,
+                done_fg=done_fg,
+                base_font=base_font,
+                trash_image=app._trash_image,
+                edit_image=app._edit_image,
+                on_toggle=app._on_toggle_item,
+                on_delete=app._on_delete_item,
+                on_edit=app._on_edit_item,
+                on_double_click=app._on_item_double_click,
+            )
+        )

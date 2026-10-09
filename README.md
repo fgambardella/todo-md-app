@@ -31,7 +31,7 @@ src/
 │   ├── assets/         # Dock/Finder icon source (dock_icon.png)
 │   ├── app.py          # TodoController (UI-agnostic view-model) + TodoApp (tkinter GUI)
 │   ├── settings_window.py # Settings Toplevel GUI (construction + save flow), lazy-imported by app.py
-│   ├── item_row.py      # Item-row widget construction + bg_kwargs helper, lazy-imported by app.py
+│   ├── item_row.py      # Item-row widget construction, row rebuild + bg_kwargs helper, lazy-imported by app.py
 │   ├── theme.py         # Theme engine (native path, clam palette, adaptive text colors)
 │   ├── edit_dialog.py   # Modal edit-item dialog (title + description), lazy-imported by app.py
 │   ├── placeholders.py  # Muted placeholder hints for ttk entries (no tkinter dep)
