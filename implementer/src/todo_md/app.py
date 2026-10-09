@@ -293,13 +293,9 @@ class TodoApp:
         self.current_list: str | None = None
         # Settings window state holder (SettingsWindow while open, else None).
         self._settings = None
-        # Edit dialog state (None while no edit modal is open).
-        self._edit_window = None
+        # Edit dialog state holder (EditItemDialog while open, else None).
+        self._edit = None
         self._edit_index: int | None = None
-        self._edit_entry = None
-        self._edit_desc_text = None
-        self._edit_save_btn = None
-        self._edit_cancel_btn = None
         self._item_rows: list[tuple] = []
         self._palette: dict | None = None
         # entry widget -> its placeholder text (empty fields show this muted
@@ -802,72 +798,48 @@ class TodoApp:
             return
         self._on_edit_item(index)
 
+    @property
+    def _edit_window(self):
+        return self._edit.window if self._edit is not None else None
+
+    @property
+    def _edit_entry(self):
+        return self._edit.entry if self._edit is not None else None
+
+    @property
+    def _edit_desc_text(self):
+        return self._edit.desc_text if self._edit is not None else None
+
+    @property
+    def _edit_save_btn(self):
+        return self._edit.save_btn if self._edit is not None else None
+
+    @property
+    def _edit_cancel_btn(self):
+        return self._edit.cancel_btn if self._edit is not None else None
+
     def _open_edit_dialog(self, index: int) -> None:
         """Open a theme-aware modal dialog to edit the item's title and description.
 
-        Window styling follows the other dialogs (Toplevel, theme bg,
-        transient). The title entry and the multi-line description box start
-        pre-populated with the item's current values. ``save`` calls
-        ``controller.edit_item`` with both, then
-        closes the dialog and refreshes the list; empty/whitespace-only
-        input raises ValueError in the controller and persists nothing, but
-        the dialog still closes. ``cancel`` closes the dialog with no
-        changes.
+        All construction lives in :class:`todo_md.edit_dialog.EditItemDialog`
+        (Toplevel, theme bg, transient, pre-populated title entry and
+        multi-line description box, save/cancel buttons, grab, centering);
+        Save delegates to ``_on_edit_save`` (which calls
+        ``controller.edit_item`` with both, then closes the dialog and
+        refreshes the list; empty/whitespace-only input raises ValueError in
+        the controller and persists nothing, but the dialog still closes)
+        and Cancel and the window close handler delegate to
+        ``_close_edit_dialog``.
         """
-        import tkinter as tk
-        from tkinter import ttk
-
-        win = tk.Toplevel(self.root)
-        if self._palette is not None:
-            win.configure(bg=self._palette["bg"])
-        win.title("Edit item")
-        win.transient(self.root)
+        if self.current_list is None:
+            return
+        from .edit_dialog import EditItemDialog  # lazy: keep module importable headless
 
         item = self.controller.open_list(self.current_list).items[index]
-        row = ttk.Frame(win, padding=10)
-        row.pack(fill=tk.X)
-        entry = ttk.Entry(row)
-        entry.pack(fill=tk.X)
-        entry.insert(0, item.text)
-
-        # Multi-line description box below the title. Plain tk.Text is not
-        # ttk-styled, so apply the entry palette colors explicitly.
-        desc_kwargs = {}
-        if self._palette is not None:
-            desc_kwargs = {
-                "bg": self._palette["entry_bg"],
-                "fg": self._palette["fg"],
-                "insertbackground": self._palette["fg"],
-                "highlightbackground": self._palette["btn_bg"],
-            }
-        desc_text = tk.Text(
-            row, height=5, width=40, wrap=tk.WORD, undo=True, **desc_kwargs
+        self._edit = EditItemDialog(
+            self, item, on_save=self._on_edit_save, on_close=self._close_edit_dialog
         )
-        desc_text.pack(fill=tk.X, pady=(8, 0))
-        desc_text.insert("1.0", item.description)
-
-        bottom = ttk.Frame(win, padding=(10, 8))
-        bottom.pack(side=tk.BOTTOM)
-        save_btn = ttk.Button(bottom, text="save")
-        save_btn.pack(side=tk.RIGHT, padx=(6, 0))
-        cancel_btn = ttk.Button(bottom, text="cancel")
-        cancel_btn.pack(side=tk.RIGHT)
-
-        save_btn.config(command=self._on_edit_save)
-        cancel_btn.config(command=self._close_edit_dialog)
-        entry.bind("<Return>", lambda _e: self._on_edit_save())
-        win.protocol("WM_DELETE_WINDOW", self._close_edit_dialog)
-
-        self._edit_window = win
         self._edit_index = index
-        self._edit_entry = entry
-        self._edit_desc_text = desc_text
-        self._edit_save_btn = save_btn
-        self._edit_cancel_btn = cancel_btn
-
-        win.grab_set()
-        win.update()
-        self._center_window_on_parent(win)
 
     def _on_edit_save(self) -> None:
         """Persist title and description via controller.edit_item, then close."""
@@ -888,15 +860,11 @@ class TodoApp:
         self._refresh_items()
 
     def _close_edit_dialog(self) -> None:
-        win = self._edit_window
-        self._edit_window = None
+        """Teardown: destroy the window (if alive) and drop the holders."""
+        if self._edit is not None:
+            self._edit.close()
+            self._edit = None
         self._edit_index = None
-        self._edit_entry = None
-        self._edit_desc_text = None
-        self._edit_save_btn = None
-        self._edit_cancel_btn = None
-        if win is not None and win.winfo_exists():
-            win.destroy()
 
     def _on_add_item(self) -> None:
         if self.current_list is None:
