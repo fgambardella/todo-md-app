@@ -33,7 +33,8 @@ src/
 │   ├── item_row.py      # Item-row widget construction + bg_kwargs helper, lazy-imported by app.py
 │   ├── theme.py         # Theme engine (native path, clam palette, adaptive text colors)
 │   ├── edit_dialog.py   # Modal edit-item dialog (title + description), lazy-imported by app.py
-│   └── placeholders.py  # Muted placeholder hints for ttk entries (no tkinter dep)
+│   ├── placeholders.py  # Muted placeholder hints for ttk entries (no tkinter dep)
+│   ├── dialogs.py       # Shared dialog helpers (centering, dock icon), lazy-imported by app.py
 │   └── __main__.py     # Entry point: python -m todo_md
 ├── requirements-dev.txt # Dev-only pins (PyInstaller)
 ├── scripts/
