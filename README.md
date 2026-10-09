@@ -29,6 +29,7 @@ src/
 │   ├── VERSION         # App version (X.Y.Z), auto-bumped by the git hook
 │   ├── assets/         # Dock/Finder icon source (dock_icon.png)
 │   ├── app.py          # TodoController (UI-agnostic view-model) + TodoApp (tkinter GUI)
+│   ├── settings_window.py # Settings Toplevel GUI (construction + save flow), lazy-imported by app.py
 │   └── __main__.py     # Entry point: python -m todo_md
 ├── requirements-dev.txt # Dev-only pins (PyInstaller)
 ├── scripts/
