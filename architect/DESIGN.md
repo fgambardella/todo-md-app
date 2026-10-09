@@ -21,6 +21,7 @@
 - `implementer/src/todo_md/theme.py` — theme engine: `apply_theme(root, app)` (native `tk appappearance` path or clam fallback with explicit palettes), `palette_for`, luminance-adaptive `text_colors`, `button_text`; duck-typed app parameter, never imports `todo_md.app`; `TodoApp` keeps `_palette` and thin `_apply_theme`/`_text_colors`/`_theme_button_text` wrappers.
 - `implementer/src/todo_md/edit_dialog.py` — `EditItemDialog` builds the modal edit Toplevel (pre-populated title entry, multi-line description, save/cancel, grab, centering); duck-typed app, callbacks for save/close; `TodoApp` keeps a `_edit` holder and read-only `_edit_*` properties.
 - `implementer/src/todo_md/placeholders.py` — `PlaceholderBinder` owns the muted-hint map and attach/focus/restore/value logic (no tkinter dependency, imported at `app.py` top level); `TodoApp._placeholders` is an alias of the binder's map.
+- `implementer/src/todo_md/dialogs.py` — shared dialog helpers: `center_window_on_parent` (self-correcting centering over the live main window) and `apply_dock_icon` (resolves `dock_icon_path` dynamically on `todo_md.app`); tkinter lazy, no `todo_md.app` import at module level.
 - `implementer/src/todo_md/settings.py` — headless `Settings` load/save and theme resolution; settings GUI has Save/Cancel, directory change with optional list movement.
 - `implementer/src/todo_md/version.py` — headless `get_version()` from `todo_md/VERSION`.
 - `implementer/src/todo_md/__main__.py` — entry point `run()` wiring controller + GUI.
@@ -43,6 +44,6 @@
 
 ## Known Architectural Debt
 
-- `app.py` (890 lines) is a god class: `TodoApp` (~615 lines) intermixes two responsibilities (main layout, dialog centering/dock icon) and also hosts `TodoController` plus headless helpers; settings window, item rows, theme engine, edit dialog, and placeholders already split out to `settings_window.py` / `item_row.py` / `theme.py` / `edit_dialog.py` / `placeholders.py` (R1-R5). Duplicated patterns: `current_list is None` guard four times, `nonlocal` closures in the controller. Being split by refactor series R6-R8 (plan in `TASKS.md`; tests frozen for the series).
+- `app.py` (859 lines) is a god class: `TodoApp` (~595 lines) centers on main layout + refresh and also hosts `TodoController` plus headless helpers; settings window, item rows, theme engine, edit dialog, placeholders, and dialog helpers already split out to `settings_window.py` / `item_row.py` / `theme.py` / `edit_dialog.py` / `placeholders.py` / `dialogs.py` (R1-R6). Duplicated patterns: `current_list is None` guard four times, `nonlocal` closures in the controller. Being split by refactor series R7-R8 (plan in `TASKS.md`; tests frozen for the series).
 - Filtered completion display and relocation/retry logic live in the controller, a growing class worth watching for a settings-domain split.
 - GUI tests depend on a local display and geometry on the local display; no headless fallback.
