@@ -461,20 +461,9 @@ class TodoApp:
         is missing or unreadable, the icon is skipped and the app runs
         normally.
         """
-        import tkinter as tk
+        from .dialogs import apply_dock_icon  # lazy: keep module importable headless
 
-        try:
-            photo = tk.PhotoImage(file=dock_icon_path())
-        except tk.TclError:
-            self._dock_icon = None
-            return
-        self._dock_icon = photo
-        try:
-            self.root.iconphoto(True, photo)
-        except tk.TclError:
-            # iconphoto is unsupported on some platforms (e.g. X11); the
-            # image is still kept alive, but its absence must never crash.
-            pass
+        self._dock_icon = apply_dock_icon(self.root)
 
     # -- entry placeholders ----------------------------------------------
 
@@ -532,30 +521,10 @@ class TodoApp:
         re-measured and one corrective nudge removes any window-manager
         frame offset (e.g. the ~title-bar-height shift on macOS).
         """
+        from .dialogs import center_window_on_parent  # lazy: keep module importable headless
+
         win.update_idletasks()
-        width, height = win.winfo_width(), win.winfo_height()
-        if width < 2 or height < 2:  # not measured yet: use requested size
-            width, height = win.winfo_reqwidth(), win.winfo_reqheight()
-        px, py = self.root.winfo_rootx(), self.root.winfo_rooty()
-        pw, ph = self.root.winfo_width(), self.root.winfo_height()
-        x = px + (pw - width) // 2
-        y = py + (ph - height) // 2
-        win.geometry(f"+{x}+{y}")
-        # Some window managers (macOS in particular) honor
-        # ``geometry('+x+y')`` against the window frame, not the client area, so
-        # the measured client origin ends up offset from the request (roughly a
-        # title-bar height on macOS). Re-measure the actual on-screen
-        # rectangles and subtract the residual centering error from the
-        # requested origin, instead of hardcoding frame sizes.
-        win.update_idletasks()
-        ox, oy = win.winfo_rootx(), win.winfo_rooty()
-        ow, oh = win.winfo_width(), win.winfo_height()
-        if ow < 2 or oh < 2:
-            ow, oh = width, height
-        ex = ox + ow // 2 - (px + pw // 2)
-        ey = oy + oh // 2 - (py + ph // 2)
-        if ex or ey:
-            win.geometry(f"+{x - ex}+{y - ey}")
+        center_window_on_parent(self.root, win)
 
     # -- settings window --------------------------------------------------
 
