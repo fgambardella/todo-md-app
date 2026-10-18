@@ -39,6 +39,10 @@ def palette_for(theme: str) -> dict:
         # Slightly darker button fill for the active/pressed states: clam's
         # default light hover fill would otherwise flash on hover.
         "btn_active": "#2e2e2e" if theme == "dark" else "#d0d0d0",
+        # Dedicated spinbox hover fill — deliberately more contrasting than
+        # btn_active; the light value equals the previous btn_active so the
+        # light theme is visually unchanged.
+        "spin_hover": "#565656" if theme == "dark" else "#d0d0d0",
         # Muted foreground for disabled states (e.g. disabled arrow glyphs).
         "fg_disabled": "#888888" if theme == "dark" else "#aaaaaa",
         "entry_bg": entry_bg,
@@ -106,6 +110,7 @@ def apply_theme(root, app) -> dict | None:
     btn_bg, entry_bg = app._palette["btn_bg"], app._palette["entry_bg"]
     list_bg = app._palette["list_bg"]
     btn_active = app._palette["btn_active"]
+    spin_hover = app._palette["spin_hover"]
     fg_disabled = app._palette["fg_disabled"]
 
     style = ttk.Style(root)
@@ -159,7 +164,7 @@ def apply_theme(root, app) -> dict | None:
     # the palette for the hover/press states (muted fg when disabled).
     style.map(
         "TSpinbox",
-        background=[("active", btn_active), ("pressed", btn_active)],
+        background=[("active", spin_hover), ("pressed", spin_hover)],
         arrowcolor=[("active", fg), ("pressed", fg), ("disabled", fg_disabled)],
     )
     root.config(bg=bg)
