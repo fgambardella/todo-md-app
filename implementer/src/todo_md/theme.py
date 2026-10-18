@@ -144,6 +144,11 @@ def apply_theme(root, app) -> dict | None:
             fieldbackground=entry_bg,
             insertcolor=fg,
         )
+    # Tk 9's C Arrow element falls back to a near-black default when
+    # -arrowcolor is unset, leaving TSpinbox up/down glyphs effectively
+    # invisible on the dark theme's field fill. Pin them to the palette
+    # text color so arrows match the theme in either mode.
+    style.configure("TSpinbox", arrowcolor=fg)
     root.config(bg=bg)
     if app.settings_window is not None and app.settings_window.winfo_exists():
         app.settings_window.config(bg=bg)
