@@ -13,6 +13,9 @@ maps, which flash a light "lighter" button-box fill on hover and make the
 chevron disappear. State lookups are done through Tcl directly
 (``ttk::style lookup ... <state>``) because ``ttk.Style.lookup`` mishandles
 the state argument.
+
+B3 replaces the hover fill with a dedicated ``spin_hover`` palette color
+that is clearly lighter than the normal arrow-box fill in dark mode.
 """
 
 import json
@@ -79,7 +82,7 @@ def test_spinbox_arrowcolor_matches_palette_fg(tmp_path, theme):
             active_arrow = root.tk.call(
                 "ttk::style", "lookup", "TSpinbox", "-arrowcolor", "active"
             )
-            assert active_bg == app._palette["btn_active"]
+            assert active_bg == app._palette["spin_hover"]
             assert active_arrow == app._palette["fg"]
             assert abs(lum(root, active_arrow) - lum(root, active_bg)) > 0.35
 
@@ -90,5 +93,42 @@ def test_spinbox_arrowcolor_matches_palette_fg(tmp_path, theme):
                     "ttk::style", "lookup", "TSpinbox", "-fieldbackground", state
                 )
                 assert value
+    finally:
+        app.root.destroy()
+
+
+@pytest.mark.parametrize("theme", ["dark", "light"])
+def test_spinbox_hover_fill_clearly_contrasts_normal_fill(tmp_path, theme):
+    """B3: the active-state button-box fill must clearly differ from the
+    normal-state fill in both themes."""
+    app = _build_app(tmp_path, theme)
+    try:
+        root = app.root
+        app.theme = theme
+        app._apply_theme(theme)
+        if app._palette is None:
+            pytest.skip(
+                "native `tk appappearance` path is active; "
+                "this test exercises the clam fallback only"
+            )
+        root.update()
+
+        normal_bg = root.tk.call("ttk::style", "lookup", "TSpinbox", "-background")
+        active_bg = root.tk.call(
+            "ttk::style", "lookup", "TSpinbox", "-background", "active"
+        )
+        assert active_bg == app._palette["spin_hover"]
+        assert abs(lum(root, normal_bg) - lum(root, active_bg)) > 0.08
+
+        active_arrow = root.tk.call(
+            "ttk::style", "lookup", "TSpinbox", "-arrowcolor", "active"
+        )
+        assert abs(lum(root, active_arrow) - lum(root, active_bg)) > 0.35
+
+        for state in ("readonly", "disabled"):
+            value = root.tk.call(
+                "ttk::style", "lookup", "TSpinbox", "-fieldbackground", state
+            )
+            assert value
     finally:
         app.root.destroy()
