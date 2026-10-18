@@ -7,6 +7,12 @@ fill (#383838) the settings spinbox up/down arrows then render at a
 contrast of about 1.3:1 — effectively invisible. The TSpinbox style must
 therefore pin ``-arrowcolor`` to the palette foreground (light arrows in
 dark, black in light) and keep it clearly separated from the field fill.
+
+B2 additionally pins the *state maps*: TSpinbox inherits TCombobox's clam
+maps, which flash a light "lighter" button-box fill on hover and make the
+chevron disappear. State lookups are done through Tcl directly
+(``ttk::style lookup ... <state>``) because ``ttk.Style.lookup`` mishandles
+the state argument.
 """
 
 import json
@@ -64,5 +70,25 @@ def test_spinbox_arrowcolor_matches_palette_fg(tmp_path, theme):
 
         fieldbackground = ttk.Style().lookup("TSpinbox", "fieldbackground")
         assert abs(lum(root, arrowcolor) - lum(root, fieldbackground)) > 0.35
+
+        # B2: active-state button box and chevron must stay legible.
+        if app._palette is not None:
+            active_bg = root.tk.call(
+                "ttk::style", "lookup", "TSpinbox", "-background", "active"
+            )
+            active_arrow = root.tk.call(
+                "ttk::style", "lookup", "TSpinbox", "-arrowcolor", "active"
+            )
+            assert active_bg == app._palette["btn_active"]
+            assert active_arrow == app._palette["fg"]
+            assert abs(lum(root, active_arrow) - lum(root, active_bg)) > 0.35
+
+            # The inherited -fieldbackground map must still resolve its
+            # readonly/disabled entries to a real color.
+            for state in ("readonly", "disabled"):
+                value = root.tk.call(
+                    "ttk::style", "lookup", "TSpinbox", "-fieldbackground", state
+                )
+                assert value
     finally:
         app.root.destroy()
