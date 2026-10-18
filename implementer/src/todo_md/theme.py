@@ -36,6 +36,11 @@ def palette_for(theme: str) -> dict:
         "bg": bg,
         "fg": fg,
         "btn_bg": btn_bg,
+        # Slightly darker button fill for the active/pressed states: clam's
+        # default light hover fill would otherwise flash on hover.
+        "btn_active": "#2e2e2e" if theme == "dark" else "#d0d0d0",
+        # Muted foreground for disabled states (e.g. disabled arrow glyphs).
+        "fg_disabled": "#888888" if theme == "dark" else "#aaaaaa",
         "entry_bg": entry_bg,
         "list_bg": list_bg,
         # Low-contrast badge color: legible but unobtrusive on bg.
@@ -100,10 +105,8 @@ def apply_theme(root, app) -> dict | None:
     bg, fg = app._palette["bg"], app._palette["fg"]
     btn_bg, entry_bg = app._palette["btn_bg"], app._palette["entry_bg"]
     list_bg = app._palette["list_bg"]
-    if theme == "dark":
-        btn_active = "#2e2e2e"
-    else:
-        btn_active = "#d0d0d0"
+    btn_active = app._palette["btn_active"]
+    fg_disabled = app._palette["fg_disabled"]
 
     style = ttk.Style(root)
     style.theme_use("clam")
@@ -149,6 +152,16 @@ def apply_theme(root, app) -> dict | None:
     # invisible on the dark theme's field fill. Pin them to the palette
     # text color so arrows match the theme in either mode.
     style.configure("TSpinbox", arrowcolor=fg)
+    # TSpinbox *inherits* TCombobox's clam state maps, which map the Arrow
+    # element's -background (its button box fill) to the theme's light
+    # "lighter" color in the active state; the chevron drawn from
+    # -arrowcolor then vanishes on hover in dark mode. Pin both options to
+    # the palette for the hover/press states (muted fg when disabled).
+    style.map(
+        "TSpinbox",
+        background=[("active", btn_active), ("pressed", btn_active)],
+        arrowcolor=[("active", fg), ("pressed", fg), ("disabled", fg_disabled)],
+    )
     root.config(bg=bg)
     if app.settings_window is not None and app.settings_window.winfo_exists():
         app.settings_window.config(bg=bg)
