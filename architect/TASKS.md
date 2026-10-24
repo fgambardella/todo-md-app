@@ -16,7 +16,9 @@ A working macOS TODO application: users create, rename, and delete lists stored 
 None. B3 completed, verified, and merged (Implementer commit `4388e2d`). Queue holds only the non-blocking backlog entry.
 
 ## Queue
-- **Backlog (non-blocking):** `TodoApp` still builds the sidebar (listbox, entries, buttons) and owns the edit-dialog open/save flow in `_build_ui`/`_open_edit_dialog`; extract to dedicated modules if `app.py` grows again.
+- **Refactoring**: `TodoApp` still builds the sidebar (listbox, entries, buttons) and owns the edit-dialog open/save flow in `_build_ui`/`_open_edit_dialog`; extract from `app.py` to dedicated modules.
+- **Change Request**: in the todo item edit modal window the description text box can't be resized. Make it resizeable by the user.
+- **Change Request**: in the todo item edit modal window the description doesn't keep empty lines after save. Preserve all empty lines in the todo item description.
 
 ## Active Blockers
 None.
