@@ -1,7 +1,8 @@
 """Edit dialog construction and lifecycle for the todo_md GUI.
 
 Owns the modal edit Toplevel (pre-populated title entry, multi-line
-description box, save/cancel buttons, grab, centering) plus the open /
+description box with vertical scrollbar, save/cancel buttons, grab,
+centering) plus the open /
 save / close lifecycle (``open_dialog`` / ``save_dialog`` /
 ``close_dialog``) so ``TodoApp`` only delegates.
 
@@ -21,8 +22,8 @@ class EditItemDialog:
     ``on_save`` fires on Save (and the entry's <Return>); ``on_close``
     fires on Cancel and on the window's WM_DELETE_WINDOW protocol. Widgets
     are exposed as public attributes (``window``, ``entry``,
-    ``desc_text``, ``save_btn``, ``cancel_btn``) so the app — and tests
-    via delegating app properties — can read or drive them.
+    ``desc_text``, ``desc_scroll``, ``save_btn``, ``cancel_btn``) so the
+    app — and tests via delegating app properties — can read or drive them.
     """
 
     def __init__(self, app, item, *, on_save, on_close) -> None:
@@ -56,12 +57,20 @@ class EditItemDialog:
                 "insertbackground": app._palette["fg"],
                 "highlightbackground": app._palette["btn_bg"],
             }
+        # Sub-frame under the title entry so the text keeps its horizontal
+        # expansion while a vertical scrollbar pins to its right edge.
+        desc_frame = ttk.Frame(row)
+        desc_frame.pack(fill=tk.X, pady=(8, 0))
         desc_text = tk.Text(
-            row, height=5, width=40, wrap=tk.WORD, undo=True, **desc_kwargs
+            desc_frame, height=5, width=40, wrap=tk.WORD, undo=True, **desc_kwargs
         )
-        desc_text.pack(fill=tk.X, pady=(8, 0))
+        desc_text.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        desc_scroll = ttk.Scrollbar(desc_frame, command=desc_text.yview)
+        desc_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        desc_text.configure(yscrollcommand=desc_scroll.set)
         desc_text.insert("1.0", item.description)
         self.desc_text = desc_text
+        self.desc_scroll = desc_scroll
 
         bottom = ttk.Frame(win, padding=(10, 8))
         bottom.pack(side=tk.BOTTOM)
