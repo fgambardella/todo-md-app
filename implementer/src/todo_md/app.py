@@ -197,40 +197,9 @@ class TodoApp:
         self.version_label.pack(side=tk.BOTTOM, anchor="e")
 
         # --- left frame: lists ------------------------------------------
-        left = ttk.Frame(self.root, padding=8)
-        left.pack(side=tk.LEFT, fill=tk.Y)
-        ttk.Label(left, text="Lists:").pack(anchor="w")
+        from .sidebar import build_sidebar  # lazy: keep module importable headless
 
-        self.listbox = tk.Listbox(left, width=22, height=14, exportselection=False)
-        self.listbox.pack(fill=tk.X, pady=(2, 6))
-        self.listbox.bind("<<ListboxSelect>>", self._on_select_list)
-
-        self.new_name_entry = ttk.Entry(left, width=20)
-        self.new_name_entry.pack(fill=tk.X)
-        self.new_name_entry.bind("<Return>", lambda _e: self._on_create_list())
-        self._attach_placeholder(
-            self.new_name_entry, "Insert the name of a new list here"
-        )
-
-        btn_row = ttk.Frame(left)
-        btn_row.pack(fill=tk.X, pady=(6, 0))
-        ttk.Button(btn_row, text="Create", command=self._on_create_list).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2)
-        )
-        ttk.Button(btn_row, text="Delete", command=self._on_delete_list).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0)
-        )
-
-        self._theme_btn = ttk.Button(
-            left, text=self._theme_button_text(), command=self._on_toggle_theme
-        )
-        self._theme_btn.pack(fill=tk.X, pady=(6, 0))
-
-        # --- settings button: opens the Toplevel settings window ---------
-        self._settings_btn = ttk.Button(
-            left, text="Settings", command=self._open_settings
-        )
-        self._settings_btn.pack(fill=tk.X, pady=(6, 0))
+        build_sidebar(self)
 
         # --- right frame: items ------------------------------------------
         right = ttk.Frame(self.root, padding=8)
@@ -517,41 +486,22 @@ class TodoApp:
         return self._edit.cancel_btn if self._edit is not None else None
 
     def _open_edit_dialog(self, index: int) -> None:
-        """Open a theme-aware modal edit dialog (construction in EditItemDialog)."""
-        if self.current_list is None:
-            return
-        from .edit_dialog import EditItemDialog  # lazy: keep module importable headless
+        """Open a theme-aware modal edit dialog (logic in :mod:`.edit_dialog`)."""
+        from .edit_dialog import open_dialog  # lazy: keep module importable headless
 
-        item = self.controller.open_list(self.current_list).items[index]
-        self._edit = EditItemDialog(
-            self, item, on_save=self._on_edit_save, on_close=self._close_edit_dialog
-        )
-        self._edit_index = index
+        open_dialog(self, index)
 
     def _on_edit_save(self) -> None:
         """Persist title and description via controller.edit_item, then close."""
-        if self._edit_window is None or self.current_list is None:
-            return
-        # tk.Text always appends a trailing newline; the controller strips.
-        description = self._edit_desc_text.get("1.0", "end-1c")
-        try:
-            self.controller.edit_item(
-                self.current_list,
-                self._edit_index,
-                self._edit_entry.get(),
-                description,
-            )
-        except ValueError:
-            pass  # empty/whitespace-only text: nothing is persisted
-        self._close_edit_dialog()
-        self._refresh_items()
+        from .edit_dialog import save_dialog  # lazy: keep module importable headless
+
+        save_dialog(self)
 
     def _close_edit_dialog(self) -> None:
         """Teardown: destroy the window (if alive) and drop the holders."""
-        if self._edit is not None:
-            self._edit.close()
-            self._edit = None
-        self._edit_index = None
+        from .edit_dialog import close_dialog  # lazy: keep module importable headless
+
+        close_dialog(self)
 
     def _on_add_item(self) -> None:
         if self.current_list is None:
