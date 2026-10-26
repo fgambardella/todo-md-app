@@ -278,6 +278,20 @@ def test_edit_item_with_description_persists(controller, tmp_path):
     assert reloaded.items[0].description == "some details"
 
 
+def test_edit_item_description_internal_blank_line_round_trips(controller, tmp_path):
+    controller.create_list("work")
+    controller.add_item("work", "task one")
+
+    edited = controller.edit_item("work", 0, "task one", "a\n\nb")
+
+    assert (edited.text, edited.description) == ("task one", "a\n\nb")
+    assert _file(tmp_path, "work").read_text(encoding="utf-8") == (
+        "# work\n- [ ] task one\n  a\n  \n  b\n"
+    )
+    reloaded = controller.open_list("work")
+    assert reloaded.items[0].description == "a\n\nb"
+
+
 def test_edit_item_same_text_changed_description_persists(
     controller, tmp_path, monkeypatch
 ):

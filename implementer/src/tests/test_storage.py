@@ -128,6 +128,38 @@ def test_save_exact_output_mixed_descriptions(store, tmp_path):
     assert store.load("mixed") == items
 
 
+def test_save_load_round_trip_internal_blank_line(store):
+    items = [
+        ("task", False, "a\n\nb"),
+        ("another", True, "x\n\n\ny"),
+    ]
+    store.save("blanks", items)
+    assert store.load("blanks") == items
+
+
+def test_save_exact_bytes_with_blank_line(store, tmp_path):
+    store.save("note", [("task", False, "a\n\nb")])
+    data = (tmp_path / "data" / "note.md").read_bytes()
+    assert data == b"# note\n- [ ] task\n  a\n  \n  b\n"
+    assert store.load("note") == [("task", False, "a\n\nb")]
+
+
+def test_load_hand_written_indented_blank_line(store, tmp_path):
+    raw = (
+        "# List\n"
+        "- [ ] a\n"
+        "  first line\n"
+        "    \n"
+        "  third line\n"
+        "- [x] b\n"
+    )
+    (tmp_path / "data" / "l.md").write_text(raw, encoding="utf-8")
+    assert store.load("l") == [
+        ("a", False, "first line\n\nthird line"),
+        ("b", True, ""),
+    ]
+
+
 def test_create_and_delete(store):
     store.create("work")
     assert store.lists() == ["work"]

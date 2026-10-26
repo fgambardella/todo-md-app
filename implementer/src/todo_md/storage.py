@@ -94,8 +94,11 @@ class MarkdownListStore:
         A checkbox line starts an item; following lines indented by two or
         more spaces (up to the next checkbox or header line, or any other
         non-indented line) form the item's description, de-indented, joined
-        with newlines, and stripped. Continuation lines before the first
-        checkbox are ignored.
+        with newlines, and stripped. A blank continuation line (indented by
+        two or more spaces) becomes an empty description line, preserving
+        internal blank lines; a genuinely unindented blank line terminates the
+        description as any other non-indented line does. Continuation lines
+        before the first checkbox are ignored.
         """
         path = self._path(name)
         if not os.path.isfile(path):
@@ -125,7 +128,10 @@ class MarkdownListStore:
                     close_current()
                     continue
                 if collecting and line.startswith(_CONTINUATION_INDENT):
-                    current[2].append(line[len(_CONTINUATION_INDENT):])
+                    if line.strip() == "":
+                        current[2].append("")
+                    else:
+                        current[2].append(line[len(_CONTINUATION_INDENT):])
                 else:
                     collecting = False
         close_current()
@@ -134,15 +140,19 @@ class MarkdownListStore:
     def save(self, name: str, items: list[tuple[str, bool, str]]) -> None:
         """Write items atomically as a markdown file (temp + os.replace).
 
-        Each non-empty description line is written as two spaces + line
-        directly under its checkbox line; an empty description adds no lines.
+        Every description line is written as two spaces + line directly under
+        its checkbox line; a blank line is written as exactly two spaces. The
+        description is stripped first, so leading/trailing blank lines add no
+        lines while internal blank lines round-trip; an empty description adds
+        no lines.
         """
         path = self._path(name)
         lines = ["# " + name]
         for text, done, description in items:
             lines.append("- [x] " + text if done else "- [ ] " + text)
-            for desc_line in description.split("\n"):
-                if desc_line:
+            stripped = description.strip()
+            if stripped:
+                for desc_line in stripped.split("\n"):
                     lines.append(_CONTINUATION_INDENT + desc_line)
         content = "\n".join(lines) + "\n"
 
