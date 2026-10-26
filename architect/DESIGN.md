@@ -34,7 +34,7 @@
 
 - Flow: GUI → `TodoController` → models → `MarkdownListStore` → `.md` files; store re-read after each mutation drives UI refresh.
 - `TodoItem` owns text, description, completion state, creation timestamp; completed items keep completion order above unfinished items.
-- Markdown format: `# Name` header, `- [ ]` / `- [x]` lines; an item description (optional, multi-line) is stored as two-space-indented continuation lines directly under its checkbox line; legacy files without them parse as empty description; hidden/filtered items are never deleted from disk.
+- Markdown format: `# Name` header, `- [ ]` / `- [x]` lines; an item description (optional, multi-line) is stored as two-space-indented continuation lines directly under its checkbox line — internal blank lines as two-space-only lines, so they round-trip (C2); legacy files without them parse as empty description; hidden/filtered items are never deleted from disk.
 - Settings persist a full payload (theme, completed-item filter count, lists directory) and apply live; relocation failures leave recoverable files and keep the old directory usable.
 
 ## External Interfaces
