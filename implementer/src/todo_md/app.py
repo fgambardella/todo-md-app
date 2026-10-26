@@ -486,41 +486,22 @@ class TodoApp:
         return self._edit.cancel_btn if self._edit is not None else None
 
     def _open_edit_dialog(self, index: int) -> None:
-        """Open a theme-aware modal edit dialog (construction in EditItemDialog)."""
-        if self.current_list is None:
-            return
-        from .edit_dialog import EditItemDialog  # lazy: keep module importable headless
+        """Open a theme-aware modal edit dialog (logic in :mod:`.edit_dialog`)."""
+        from .edit_dialog import open_dialog  # lazy: keep module importable headless
 
-        item = self.controller.open_list(self.current_list).items[index]
-        self._edit = EditItemDialog(
-            self, item, on_save=self._on_edit_save, on_close=self._close_edit_dialog
-        )
-        self._edit_index = index
+        open_dialog(self, index)
 
     def _on_edit_save(self) -> None:
         """Persist title and description via controller.edit_item, then close."""
-        if self._edit_window is None or self.current_list is None:
-            return
-        # tk.Text always appends a trailing newline; the controller strips.
-        description = self._edit_desc_text.get("1.0", "end-1c")
-        try:
-            self.controller.edit_item(
-                self.current_list,
-                self._edit_index,
-                self._edit_entry.get(),
-                description,
-            )
-        except ValueError:
-            pass  # empty/whitespace-only text: nothing is persisted
-        self._close_edit_dialog()
-        self._refresh_items()
+        from .edit_dialog import save_dialog  # lazy: keep module importable headless
+
+        save_dialog(self)
 
     def _close_edit_dialog(self) -> None:
         """Teardown: destroy the window (if alive) and drop the holders."""
-        if self._edit is not None:
-            self._edit.close()
-            self._edit = None
-        self._edit_index = None
+        from .edit_dialog import close_dialog  # lazy: keep module importable headless
+
+        close_dialog(self)
 
     def _on_add_item(self) -> None:
         if self.current_list is None:
