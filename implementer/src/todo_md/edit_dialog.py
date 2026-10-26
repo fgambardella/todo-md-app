@@ -22,7 +22,8 @@ class EditItemDialog:
     ``on_save`` fires on Save (and the entry's <Return>); ``on_close``
     fires on Cancel and on the window's WM_DELETE_WINDOW protocol. Widgets
     are exposed as public attributes (``window``, ``entry``,
-    ``desc_text``, ``desc_scroll``, ``save_btn``, ``cancel_btn``) so the
+    ``desc_text``, ``desc_scroll``, ``save_btn``, ``cancel_btn``,
+    ``resize_grip``) so the
     app — and tests via delegating app properties — can read or drive them.
     """
 
@@ -41,7 +42,7 @@ class EditItemDialog:
         self.window = win
 
         row = ttk.Frame(win, padding=10)
-        row.pack(fill=tk.X)
+        row.pack(fill=tk.BOTH, expand=True)
         entry = ttk.Entry(row)
         entry.pack(fill=tk.X)
         entry.insert(0, item.text)
@@ -57,20 +58,35 @@ class EditItemDialog:
                 "insertbackground": app._palette["fg"],
                 "highlightbackground": app._palette["btn_bg"],
             }
-        # Sub-frame under the title entry so the text keeps its horizontal
-        # expansion while a vertical scrollbar pins to its right edge.
+        # Sub-frame under the title entry so the text expands with the
+        # window in BOTH dimensions (C3) while a vertical scrollbar pins
+        # to its right edge.
         desc_frame = ttk.Frame(row)
-        desc_frame.pack(fill=tk.X, pady=(8, 0))
+        desc_frame.pack(fill=tk.BOTH, expand=True, pady=(8, 0))
         desc_text = tk.Text(
             desc_frame, height=5, width=40, wrap=tk.WORD, undo=True, **desc_kwargs
         )
-        desc_text.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        desc_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         desc_scroll = ttk.Scrollbar(desc_frame, command=desc_text.yview)
         desc_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         desc_text.configure(yscrollcommand=desc_scroll.set)
         desc_text.insert("1.0", item.description)
         self.desc_text = desc_text
         self.desc_scroll = desc_scroll
+
+        # Visible resize grip in the very bottom strip: a raised frame
+        # with the size cursor. Packed BEFORE the bottom button frame so
+        # pack (bottom-side widgets follow call order) places it below.
+        # On the clam-fallback path pin the palette bg; leave unset on the
+        # native path so the window background shows through.
+        grip_kwargs = {}
+        if app._palette is not None:
+            grip_kwargs = {"bg": app._palette["bg"]}
+        # "bottom_right_corner" is a size cursor (the Motif-era
+        # "size_rse_nw_se" alias was removed in Tk 9).
+        resize_grip = tk.Frame(win, bd=1, relief=tk.RAISED, cursor="bottom_right_corner", **grip_kwargs)
+        resize_grip.pack(side=tk.BOTTOM, anchor=tk.E)
+        self.resize_grip = resize_grip
 
         bottom = ttk.Frame(win, padding=(10, 8))
         bottom.pack(side=tk.BOTTOM)

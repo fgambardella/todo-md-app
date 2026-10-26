@@ -1,12 +1,15 @@
-"""GUI tests: the edit dialog's description box has a working scrollbar.
+"""GUI tests: the edit dialog's description box has a working scrollbar
+and is truly user-resizable (C3).
 
 Covers: the dialog opens with a vertical scrollbar paired to the
 multi-line description ``tk.Text``; the two-way wiring
 (``desc_text`` yscrollcommand drives the scrollbar thumb, the
 scrollbar command drives the text view); content longer than the
 viewport is reachable (multi-page text scrolls, ``yview()`` and the
-scrollbar fraction respond); and the scrollbar renders in both light
-and dark themes.
+scrollbar fraction respond); the scrollbar renders in both light and
+dark themes; the description box grows when the dialog window is
+resized taller (fill=BOTH/expand chain); and the visible resize grip
+(sized cursor, raised frame) exists in both themes.
 """
 
 import json
@@ -71,6 +74,64 @@ def test_edit_dialog_opens_with_scrollbar(tmp_path):
     finally:
         app._close_edit_dialog()
         app.root.destroy()
+
+
+def test_resizing_window_taller_grows_desc_text(tmp_path):
+    app = _make_app(tmp_path)
+    try:
+        app.root.update()
+        app._select_list_name("Edits")
+        app.root.update()
+
+        dialog = _open_edit(app)
+        win, desc = dialog.window, dialog.desc_text
+        app.root.update()
+
+        h0 = win.winfo_height()
+        d0 = desc.winfo_height()
+        assert d0 > 0
+
+        # Grow the dialog well beyond its initial 5-line viewport.
+        win.geometry(f"{win.winfo_width()}x{h0 + 250}")
+        app.root.update()
+        d1 = desc.winfo_height()
+
+        # The text box follows the window vertically (fill=BOTH chain),
+        # and so does its paired scrollbar (fill=Y over a taller box).
+        assert d1 > d0, f"desc_text must grow: {d0} -> {d1}"
+        sb_h = dialog.desc_scroll.winfo_height()
+        assert sb_h > d0 * 0.5, f"scrollbar should track the taller box: {sb_h}"
+    finally:
+        app._close_edit_dialog()
+        app.root.destroy()
+
+
+def test_resize_grip_exists_with_size_cursor_in_both_themes(tmp_path):
+    for theme in ("light", "dark"):
+        case_dir = tmp_path / theme
+        case_dir.mkdir()
+        _write_config(case_dir, theme)
+        app = _make_app(case_dir)
+        try:
+            app.root.update()
+            assert app.theme == theme
+            app._select_list_name("Edits")
+            app.root.update()
+
+            dialog = _open_edit(app)
+            grip = dialog.resize_grip
+            assert isinstance(grip, tk.Frame)
+            assert grip.winfo_exists()
+            app.root.update()
+            assert grip.winfo_manager() == "pack"
+            # Sizing affordance: the size cursor on a raised frame.
+            assert grip.cget("cursor") == "bottom_right_corner"
+            assert grip.cget("relief") == "raised"
+            # The grip is the very bottom strip, below the button row.
+            assert dialog.save_btn.winfo_rooty() < grip.winfo_rooty()
+        finally:
+            app._close_edit_dialog()
+            app.root.destroy()
 
 
 def test_scrollbar_wired_both_directions(tmp_path):
