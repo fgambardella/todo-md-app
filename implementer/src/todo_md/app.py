@@ -197,40 +197,9 @@ class TodoApp:
         self.version_label.pack(side=tk.BOTTOM, anchor="e")
 
         # --- left frame: lists ------------------------------------------
-        left = ttk.Frame(self.root, padding=8)
-        left.pack(side=tk.LEFT, fill=tk.Y)
-        ttk.Label(left, text="Lists:").pack(anchor="w")
+        from .sidebar import build_sidebar  # lazy: keep module importable headless
 
-        self.listbox = tk.Listbox(left, width=22, height=14, exportselection=False)
-        self.listbox.pack(fill=tk.X, pady=(2, 6))
-        self.listbox.bind("<<ListboxSelect>>", self._on_select_list)
-
-        self.new_name_entry = ttk.Entry(left, width=20)
-        self.new_name_entry.pack(fill=tk.X)
-        self.new_name_entry.bind("<Return>", lambda _e: self._on_create_list())
-        self._attach_placeholder(
-            self.new_name_entry, "Insert the name of a new list here"
-        )
-
-        btn_row = ttk.Frame(left)
-        btn_row.pack(fill=tk.X, pady=(6, 0))
-        ttk.Button(btn_row, text="Create", command=self._on_create_list).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=(0, 2)
-        )
-        ttk.Button(btn_row, text="Delete", command=self._on_delete_list).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, padx=(2, 0)
-        )
-
-        self._theme_btn = ttk.Button(
-            left, text=self._theme_button_text(), command=self._on_toggle_theme
-        )
-        self._theme_btn.pack(fill=tk.X, pady=(6, 0))
-
-        # --- settings button: opens the Toplevel settings window ---------
-        self._settings_btn = ttk.Button(
-            left, text="Settings", command=self._open_settings
-        )
-        self._settings_btn.pack(fill=tk.X, pady=(6, 0))
+        build_sidebar(self)
 
         # --- right frame: items ------------------------------------------
         right = ttk.Frame(self.root, padding=8)
