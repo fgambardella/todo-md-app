@@ -33,7 +33,8 @@ src/
 │   ├── settings_window.py # Settings Toplevel GUI (construction + save flow), lazy-imported by app.py
 │   ├── item_row.py      # Item-row widget construction, row rebuild + bg_kwargs helper, lazy-imported by app.py
 │   ├── theme.py         # Theme engine (native path, clam palette, adaptive text colors)
-│   ├── edit_dialog.py   # Modal edit-item dialog (title + description), lazy-imported by app.py
+│   ├── edit_dialog.py   # Modal edit-item dialog (title + description with vertical scrollbar) + open/save/close lifecycle, lazy-imported by app.py
+│   ├── sidebar.py       # List sidebar (listbox, new-list entry, create/delete/theme/settings buttons), lazy-imported by app.py
 │   ├── placeholders.py  # Muted placeholder hints for ttk entries (no tkinter dep)
 │   ├── dialogs.py       # Shared dialog helpers (centering, dock icon), lazy-imported by app.py
 │   └── __main__.py     # Entry point: python -m todo_md
@@ -84,7 +85,7 @@ cd src
 .venv/bin/python -m pytest tests -v
 ```
 
-Expected: 344 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_settings.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, `test_startup.py`, `test_visible_items.py`, `test_dialog_guard.py`, `test_gui_lifecycle.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_edit.py`, `test_gui_double_click.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`, `test_gui_dock_icon.py`, `test_gui_settings.py`, `test_gui_centering.py`.
+Expected: 356 passing tests (plus 2 skipped gated integration tests: full build with `RUN_BUILD_TESTS=1`, release packaging with `RUN_RELEASE_TESTS=1`) across `test_storage.py`, `test_models.py`, `test_controller.py`, `test_settings.py`, `test_version.py`, `test_gui_headless.py` (the latter also includes an end-to-end session that asserts the exact Markdown produced on disk), `test_build_script.py`, `test_release_package.py`, `test_startup.py`, `test_visible_items.py`, `test_dialog_guard.py`, `test_gui_lifecycle.py`, plus GUI tests `test_gui_toggle.py`, `test_gui_layout.py`, `test_gui_delete.py`, `test_gui_delete_icon.py`, `test_gui_trash_icon.py`, `test_gui_edit.py`, `test_gui_double_click.py`, `test_gui_contrast.py`, `test_gui_theme.py`, `test_gui_theme_switch.py`, `test_gui_hover.py`, `test_gui_new_list.py`, `test_gui_version.py`, `test_gui_version_colors.py`, `test_gui_placeholders.py`, `test_gui_confirm.py`, `test_gui_dock_icon.py`, `test_gui_settings.py`, `test_gui_centering.py`, `test_gui_spinbox_arrows.py`, `test_gui_edit_resizable.py`.
 
 ## Running the app
 
