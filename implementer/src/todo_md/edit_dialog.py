@@ -104,6 +104,15 @@ class EditItemDialog:
 
         win.grab_set()
         win.update()
+        # Open sized at 50% of the live main window (C4); the floors guard
+        # against a tiny main window (Tk clamps to the content minimum
+        # anyway), then a second update so the new size is live when the
+        # self-correcting centering runs on both axes.
+        main = self.app.root
+        w = max(200, main.winfo_width() // 2)
+        h = max(150, main.winfo_height() // 2)
+        win.geometry(f"{w}x{h}")
+        win.update()
         app._center_window_on_parent(win)
 
     def close(self) -> None:
